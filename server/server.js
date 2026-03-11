@@ -64,8 +64,19 @@ app.use((req, res, next) => {
 });
 
 // CORS - MUST be early, before rate limiting
+const allowedOrigins = [
+  config.clientUrl,
+  'https://notesmitra.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+].filter(Boolean);
 app.use(cors({
-  origin: config.clientUrl,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'x-idempotency-key'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
@@ -341,7 +352,7 @@ let server;
 // Initialize Socket.io with secure CORS configuration
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: config.clientUrl,
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization']
