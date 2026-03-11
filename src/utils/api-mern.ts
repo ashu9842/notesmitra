@@ -1,6 +1,7 @@
 // NotesMitra MERN Stack API Client
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const _rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = _rawApiUrl.endsWith('/api') ? _rawApiUrl : `${_rawApiUrl}/api`;
 
 const getCsrfToken = () => {
   const match = document.cookie.match(/(?:^|; )csrfToken=([^;]+)/);
