@@ -1,0 +1,58 @@
+# Dependencies
+node_modules
+npm-debug.log
+package-lock.json
+
+# Development files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Testing
+coverage
+*.test.js
+*.spec.js
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Documentation
+*.md
+!README.md
+
+# Logs
+logs
+*.log
+
+# Nginx
+nginx.conf
+logs/nginx
+
+# Uploads (will be mounted as volume in production)
+uploads/*
+!uploads/.gitkeep
+
+# Temporary files
+tmp
+temp
+*.tmp

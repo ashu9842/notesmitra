@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <!-- Premium indigo-violet gradient -->
+    <radialGradient id="bgGrad" cx="35%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#6366F1"/>
+      <stop offset="55%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#312E81"/>
+    </radialGradient>
+    <!-- Shine highlight -->
+    <radialGradient id="shineGrad" cx="40%" cy="25%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Border gradient ring -->
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A5B4FC"/>
+      <stop offset="50%" stop-color="#4F46E5"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer glow ring -->
+  <circle cx="250" cy="250" r="248" fill="none" stroke="url(#ringGrad)" stroke-width="4" opacity="0.6"/>
+
+  <!-- Main background circle -->
+  <circle cx="250" cy="250" r="238" fill="url(#bgGrad)"/>
+
+  <!-- Shine overlay -->
+  <circle cx="250" cy="250" r="238" fill="url(#shineGrad)"/>
+
+  <!-- Subtle decorative arc -->
+  <circle cx="250" cy="250" r="220" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="1.5"/>
+
+  <!-- NM Monogram – white, premium serif weight -->
+  <text x="155" y="315" font-family="Georgia, 'Times New Roman', serif" font-size="175" font-weight="bold"
+        fill="#FFFFFF" text-anchor="middle" filter="url(#glow)" opacity="0.95">N</text>
+  <text x="345" y="315" font-family="Georgia, 'Times New Roman', serif" font-size="175" font-weight="bold"
+        fill="#FFFFFF" text-anchor="middle" filter="url(#glow)" opacity="0.95">M</text>
+
+  <!-- Gold accent dot -->
+  <circle cx="250" cy="385" r="8" fill="#F59E0B" opacity="0.9"/>
+</svg>

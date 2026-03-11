@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Environment files - NEVER commit these
+.env
+server/.env
+*.env.local
+*.env.production
+
+# Build output
+dist/
+
+# Logs
+logs/
+*.log
+server/logs/
+server/server/logs/
+
+# Uploads (local files - use Cloudinary in production)
+uploads/
+server/uploads/
+!uploads/.gitkeep
+!server/uploads/.gitkeep
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
+
+# PM2
+.pm2/

@@ -1,0 +1,76 @@
+2026-03-08 15:49:07 [[34mdebug[39m]: ℹ️  Cache: Redis disabled by config. Caching unavailable.
+2026-03-08 15:49:07 [[34mdebug[39m]: ℹ️  Queues: Redis disabled. Background jobs will run synchronously.
+2026-03-08 15:49:07 [[34mdebug[39m]: ℹ️  Worker: Redis disabled. Payment log worker not started.
+2026-03-08 15:49:07 [[34mdebug[39m]: ℹ️  Worker: Redis disabled. Email worker not started.
+2026-03-08 15:49:07 [[34mdebug[39m]: ℹ️  Redis adapter disabled by config. Running without Redis.
+2026-03-08 15:49:07 [[32minfo[39m]: Server started successfully {"environment":"development","port":5000,"url":"http://localhost:5000","socketUrl":"ws://localhost:5000"}
+2026-03-08 15:49:07 [[32minfo[39m]: NotesMitra Server Running on port 5000
+2026-03-08 15:49:07 [[32minfo[39m]: Environment: development
+2026-03-08 15:49:07 [[32minfo[39m]: MongoDB connected successfully {"host":"ac-bwf3kri-shard-00-00.1rlgbxz.mongodb.net","database":"notesmitra","queryTimeout":"10s"}
+2026-03-08 15:49:07 [[32minfo[39m]: Index migration completed {"collection":"wallets","action":"dropped transactions.id_1"}
+2026-03-08 15:49:07 [[34mdebug[39m]: MongoDB Connected: ac-bwf3kri-shard-00-00.1rlgbxz.mongodb.net
+2026-03-08 15:49:07 [[34mdebug[39m]: Database: notesmitra
+2026-03-08 15:49:07 [[34mdebug[39m]: Global query timeout: 10s
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"purchases.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"wallets.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"refreshtokens.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"institutions.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"purchases.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"wallets.createIndex","duration":"0ms"}
+2026-03-08 15:49:07 [[34mdebug[39m]: Database Query {"query":"refreshtokens.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"institutions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"purchases.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"wallets.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"refreshtokens.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"subscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"institutions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"purchases.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"institutions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"tickets.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"subscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"purchases.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"institutions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"tickets.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"subscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"purchases.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"institutions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"tickets.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"subscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"subscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"refreshtokens.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"subscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"notes.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"subscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"usersubscriptions.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"tickets.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"tickets.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:08 [[34mdebug[39m]: Database Query {"query":"users.createIndex","duration":"0ms"}
+2026-03-08 15:49:18 [[31merror[39m]: The requested resource was not found. {"stack":"Error: The requested resource was not found.\n    at notFound (file:///C:/Users/ashut/Downloads/Notes/server/middleware/error.js:110:17)\n    at Layer.handle [as handle_request] (C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\layer.js:95:5)\n    at trim_prefix (C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\index.js:328:13)\n    at C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\index.js:286:9\n    at Function.process_params (C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\index.js:346:12)\n    at next (C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\index.js:280:10)\n    at requireCsrf (file:///C:/Users/ashut/Downloads/Notes/server/middleware/csrf.js:35:12)\n    at Layer.handle [as handle_request] (C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\layer.js:95:5)\n    at trim_prefix (C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\index.js:328:13)\n    at C:\\Users\\ashut\\Downloads\\Notes\\server\\node_modules\\express\\lib\\router\\index.js:286:9","name":"Error","code":"NOT_FOUND","request":{"method":"GET","url":"/api/health","ip":"::1"}}
+2026-03-08 15:49:18 [[32mhttp[39m]: GET /api/health 404 5.14 ms - 84
+2026-03-08 15:49:18 [[32mhttp[39m]: HTTP Request {"method":"GET","url":"/api/health","status":404,"responseTime":"5.66ms","ip":"::1","userAgent":"Mozilla/5.0 (Windows NT; Windows NT 10.0; en-IN) WindowsPowerShell/5.1.26100.7920"}
