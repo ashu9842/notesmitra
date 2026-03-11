@@ -627,7 +627,10 @@ export const previewNote = async (req, res, next) => {
       });
     }
 
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    // Prefer X-Forwarded-Proto (set by Render/Heroku/nginx) so the URL is
+    // always HTTPS in production, even though SSL is terminated at the proxy.
+    const proto = req.headers['x-forwarded-proto']?.split(',')[0].trim() || req.protocol;
+    const baseUrl = `${proto}://${req.get('host')}`;
     return res.status(200).json({
       success: true,
       previewUrl: `${baseUrl}/api/notes/${note._id}/preview/file`

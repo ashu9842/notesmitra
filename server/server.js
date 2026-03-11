@@ -55,6 +55,10 @@ import premiumRoutes from './routes/premiumRoutes.js';
 // Initialize express app
 const app = express();
 
+// Trust the first proxy (Render, Heroku, etc.) so req.protocol correctly
+// reflects HTTPS even though the proxy terminates SSL before reaching Node.js.
+app.set('trust proxy', 1);
+
 app.disable('x-powered-by');
 
 // Remove the Server header so the underlying technology stack is not fingerprinted
