@@ -3,9 +3,36 @@
 const _rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_BASE_URL = _rawApiUrl.endsWith('/api') ? _rawApiUrl : `${_rawApiUrl}/api`;
 
+// In cross-origin deployments (e.g. Vercel + Render), the CSRF cookie set by the
+// server on onrender.com is NOT readable via document.cookie from vercel.app due to
+// the Same-Origin Policy.  We store the token returned in auth response bodies and
+// use it as the X-CSRF-Token header on state-changing requests.
+let _csrfTokenMemory = '';
+
+export const storeCsrfToken = (token: string) => {
+  if (token) _csrfTokenMemory = token;
+};
+
 const getCsrfToken = () => {
-  const match = document.cookie.match(/(?:^|; )csrfToken=([^;]+)/);
-  return match ? decodeURIComponent(match[1]) : '';
+  // Same-origin: cookie is directly readable
+  const cookieMatch = document.cookie.match(/(?:^|; )csrfToken=([^;]+)/);
+  if (cookieMatch) return decodeURIComponent(cookieMatch[1]);
+  // Cross-origin: use the in-memory token obtained from the auth response body
+  return _csrfTokenMemory;
+};
+
+// Fetch a fresh CSRF token from the server (called once on app init).
+// This covers page-refresh scenarios where the in-memory token was cleared.
+export const initCsrfToken = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/csrf-token`, { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data?.csrfToken) storeCsrfToken(data.data.csrfToken);
+    }
+  } catch {
+    // non-critical — CSRF token will be obtained after next auth action
+  }
 };
 
 // Helper to get auth headers
@@ -51,7 +78,7 @@ const formatApiErrorMessage = (status: number, payload: unknown) => {
     }
     return 'Your session expired. Please sign in again.';
   }
-  if (status === 403) return 'You do not have permission for this action.';
+  if (status === 403) return serverMessage || 'You do not have permission for this action.';
   if (status === 404) return serverMessage || 'Requested resource was not found.';
   if (status === 408) return 'Request timed out. Please try again.';
   if (status === 413) return 'File is too large. Please upload a smaller file.';

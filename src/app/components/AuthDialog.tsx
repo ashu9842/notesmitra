@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { toast } from "sonner";
 import { formatClientErrorMessage } from "../../utils/errorMessages";
 import { signInWithGoogle, sendPasswordResetLinkViaFirebase } from "../../utils/firebase";
+import { storeCsrfToken } from "../../utils/api-mern";
 
 interface AuthDialogProps {
   isOpen: boolean;
@@ -92,7 +93,8 @@ export function AuthDialog({ isOpen, onClose, onLogin, onGoogleLogin }: AuthDial
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Google sign-in failed');
-      onGoogleLogin(data.user);
+      if (data?.data?.csrfToken) storeCsrfToken(data.data.csrfToken);
+      onGoogleLogin(data.data?.user || data.user);
       resetForm();
       onClose();
     } catch (err: unknown) {

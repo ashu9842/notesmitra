@@ -6,7 +6,9 @@ const isProduction = process.env.NODE_ENV === 'production';
 const getCsrfCookieOptions = () => ({
   httpOnly: false,
   secure: isProduction,
-  sameSite: isProduction ? 'strict' : 'lax',
+  // 'none' required for cross-origin deployment so the cookie is sent on
+  // cross-site fetch requests AND so the token can be read from the response body.
+  sameSite: isProduction ? 'none' : 'lax',
   maxAge: 7 * 24 * 60 * 60 * 1000
 });
 

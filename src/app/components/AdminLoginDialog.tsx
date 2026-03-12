@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { toast } from "sonner";
-import { authAPI } from "../../utils/api-mern";
+import { authAPI, storeCsrfToken } from "../../utils/api-mern";
 import { formatClientErrorMessage } from "../../utils/errorMessages";
 
 interface AdminLoginDialogProps {
@@ -32,6 +32,9 @@ export function AdminLoginDialog({ isOpen, onClose, onLogin }: AdminLoginDialogP
     try {
       const response = await authAPI.adminSignIn(email, password);
       
+      // Store CSRF token for subsequent state-changing requests
+      if (response.csrfToken) storeCsrfToken(response.csrfToken);
+
       // Role verification is now done on backend, but keep this as safety check
       if (response.user.role !== 'admin') {
         toast.error(formatClientErrorMessage("You do not have admin privileges"));

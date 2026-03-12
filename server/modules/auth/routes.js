@@ -19,6 +19,8 @@ import {
 import { protect } from '../../middleware/auth.js';
 import { authLimiter } from '../../config/rateLimit.js';
 import { validateBody } from '../../middleware/validate.js';
+import { setCsrfCookie } from '../../middleware/csrf.js';
+import { successResponse } from '../../utils/response.js';
 import {
   signupSchema,
   signinSchema,
@@ -34,6 +36,13 @@ const router = express.Router();
 router.post('/google/firebase', firebaseGoogleAuth);
 // Email verification link (browser redirect — not rate-limited)
 router.get('/verify-email/:token', verifyEmail);
+
+// CSRF token endpoint — called on app init so the frontend can obtain a fresh
+// token even without logging in (needed for cross-origin SameSite=None setup).
+router.get('/csrf-token', (req, res) => {
+  const csrfToken = setCsrfCookie(res);
+  return successResponse(res, { csrfToken });
+});
 
 // All other auth routes are rate-limited
 router.use(authLimiter);

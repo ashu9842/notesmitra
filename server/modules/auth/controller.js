@@ -23,7 +23,9 @@ const getCookieOptions = (type) => {
   const baseOptions = {
     httpOnly: true,
     secure: isProduction,
-    sameSite: isProduction ? 'strict' : 'lax'
+    // 'none' required for cross-origin deployment (Vercel frontend + Render backend).
+    // SameSite=None must be paired with Secure=true (already set above).
+    sameSite: isProduction ? 'none' : 'lax'
   };
 
   if (type === AUTH_TOKEN_TYPES.ACCESS) {
@@ -44,7 +46,7 @@ const getCookieOptions = (type) => {
 const getClearCookieOptions = () => ({
   httpOnly: true,
   secure: isProduction,
-  sameSite: isProduction ? 'strict' : 'lax'
+  sameSite: isProduction ? 'none' : 'lax'
 });
 
 const authRepository = new AuthRepository();
@@ -86,14 +88,14 @@ export const signup = async (req, res) => {
 
     res.cookie(ACCESS_COOKIE_NAME, accessToken, getCookieOptions(AUTH_TOKEN_TYPES.ACCESS));
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, getCookieOptions(AUTH_TOKEN_TYPES.REFRESH));
-    setCsrfCookie(res);
+    const csrfToken = setCsrfCookie(res);
 
     // Email verification is handled by Firebase on the frontend (sendFirebaseVerificationEmail).
     // The backend marks isEmailVerified = true via POST /auth/confirm-email-verified
     // once Firebase reports the email as verified.
 
     res.status(201);
-    return successResponse(res, { user });
+    return successResponse(res, { user, csrfToken });
   } catch (error) {
     return errorResponse(res, error);
   }
@@ -113,10 +115,10 @@ export const signin = async (req, res) => {
 
     res.cookie(ACCESS_COOKIE_NAME, accessToken, getCookieOptions(AUTH_TOKEN_TYPES.ACCESS));
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, getCookieOptions(AUTH_TOKEN_TYPES.REFRESH));
-    setCsrfCookie(res);
+    const csrfToken = setCsrfCookie(res);
 
     res.status(200);
-    return successResponse(res, { user });
+    return successResponse(res, { user, csrfToken });
   } catch (error) {
     return errorResponse(res, error);
   }
@@ -136,10 +138,10 @@ export const adminSignin = async (req, res) => {
 
     res.cookie(ACCESS_COOKIE_NAME, accessToken, getCookieOptions(AUTH_TOKEN_TYPES.ACCESS));
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, getCookieOptions(AUTH_TOKEN_TYPES.REFRESH));
-    setCsrfCookie(res);
+    const csrfToken = setCsrfCookie(res);
 
     res.status(200);
-    return successResponse(res, { user });
+    return successResponse(res, { user, csrfToken });
   } catch (error) {
     return errorResponse(res, error);
   }
@@ -157,10 +159,10 @@ export const refreshAccessToken = async (req, res) => {
     });
 
     res.cookie(ACCESS_COOKIE_NAME, accessToken, getCookieOptions(AUTH_TOKEN_TYPES.ACCESS));
-    setCsrfCookie(res);
+    const csrfToken = setCsrfCookie(res);
 
     res.status(200);
-    return successResponse(res, {}, 'Access token refreshed');
+    return successResponse(res, { csrfToken }, 'Access token refreshed');
   } catch (error) {
     return errorResponse(res, error);
   }
@@ -461,10 +463,10 @@ export const firebaseGoogleAuth = async (req, res) => {
 
     res.cookie(ACCESS_COOKIE_NAME, accessToken, getCookieOptions(AUTH_TOKEN_TYPES.ACCESS));
     res.cookie(REFRESH_COOKIE_NAME, refreshToken, getCookieOptions(AUTH_TOKEN_TYPES.REFRESH));
-    setCsrfCookie(res);
+    const csrfToken = setCsrfCookie(res);
 
     res.status(200);
-    return successResponse(res, { user });
+    return successResponse(res, { user, csrfToken });
   } catch (error) {
     return errorResponse(res, error);
   }

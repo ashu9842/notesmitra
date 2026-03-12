@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { toast } from "sonner";
 import SocketClient from "../utils/socketClient";
 import { useTicketUpdates, getTicketUpdateNotification } from "../utils/useTicketUpdates";
-import { authAPI, adminAPI, notesAPI, paymentAPI, premiumAPI, ticketsAPI, walletAPI, razorpayAPI } from "../utils/api-mern";
+import { authAPI, adminAPI, notesAPI, paymentAPI, premiumAPI, ticketsAPI, walletAPI, razorpayAPI, storeCsrfToken, initCsrfToken } from "../utils/api-mern";
 import { formatClientErrorMessage } from "../utils/errorMessages";
 import { sendFirebaseVerificationEmail, checkFirebaseEmailVerified, resendFirebaseVerificationEmail, completeFirebasePasswordReset } from "../utils/firebase";
 import "../styles/index.css";
@@ -542,6 +542,8 @@ export default function App() {
     };
 
     loadProfileWithRetry();
+    // Fetch a fresh CSRF token so cross-origin POST requests work before login.
+    initCsrfToken();
 
     if (resetToken) {
       setResetPasswordToken(resetToken);
@@ -794,6 +796,10 @@ export default function App() {
         showErrorToast("Authentication failed. Please try again.", "Authentication failed. Please try again.");
         return;
       }
+
+      // Store CSRF token returned in the response body (required for cross-origin deployments
+      // where document.cookie can't read the token set by the separate API origin).
+      if (data.csrfToken) storeCsrfToken(data.csrfToken);
 
       let mappedUser = mapUserFromApi(data.user);
 
