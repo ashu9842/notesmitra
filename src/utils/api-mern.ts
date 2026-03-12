@@ -163,6 +163,13 @@ export const authAPI = {
       body: JSON.stringify({ email, password }),
     });
   },
+
+  googleFirebaseSignIn: async (idToken: string) => {
+    return apiCall('/auth/google/firebase', {
+      method: 'POST',
+      body: JSON.stringify({ idToken }),
+    });
+  },
   
   signOut: async () => {
     return apiCall('/auth/logout', {

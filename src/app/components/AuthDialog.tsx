@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { toast } from "sonner";
 import { formatClientErrorMessage } from "../../utils/errorMessages";
 import { signInWithGoogle, sendPasswordResetLinkViaFirebase } from "../../utils/firebase";
-import { storeCsrfToken } from "../../utils/api-mern";
+import { storeCsrfToken, authAPI } from "../../utils/api-mern";
 
 interface AuthDialogProps {
   isOpen: boolean;
@@ -84,16 +84,7 @@ export function AuthDialog({ isOpen, onClose, onLogin, onGoogleLogin }: AuthDial
     try {
       setGoogleLoading(true);
       const idToken = await signInWithGoogle();
-      const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-      const res = await fetch(`${apiBase}/auth/google/firebase`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ idToken }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Google sign-in failed');
-      // successResponse returns a flat object: { success, user, csrfToken }
+      const data = await authAPI.googleFirebaseSignIn(idToken);
       if (data?.csrfToken) storeCsrfToken(data.csrfToken);
       onGoogleLogin(data.user);
       resetForm();
