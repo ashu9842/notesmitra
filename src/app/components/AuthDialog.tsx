@@ -93,8 +93,9 @@ export function AuthDialog({ isOpen, onClose, onLogin, onGoogleLogin }: AuthDial
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Google sign-in failed');
-      if (data?.data?.csrfToken) storeCsrfToken(data.data.csrfToken);
-      onGoogleLogin(data.data?.user || data.user);
+      // successResponse returns a flat object: { success, user, csrfToken }
+      if (data?.csrfToken) storeCsrfToken(data.csrfToken);
+      onGoogleLogin(data.user);
       resetForm();
       onClose();
     } catch (err: unknown) {
