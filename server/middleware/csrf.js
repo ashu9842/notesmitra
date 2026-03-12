@@ -37,17 +37,23 @@ export const requireCsrf = (req, res, next) => {
     return next();
   }
 
+  // Use req.originalUrl — it is NEVER modified by Express prefix-stripping
+  // (e.g. app.use('/api', limiter) changes req.url but not req.originalUrl).
+  const url = req.originalUrl.split('?')[0]; // strip query string
+
   if (
-    req.path.startsWith('/api/auth/signin') ||
-    req.path.startsWith('/api/auth/signup') ||
-    req.path.startsWith('/api/auth/refresh') ||
-    req.path.startsWith('/api/auth/google/firebase') ||
-    req.path.startsWith('/api/auth/forgot-password') ||
-    req.path.startsWith('/api/auth/reset-password') ||
-    req.path.startsWith('/api/auth/verify-email') ||
-    req.path.startsWith('/api/auth/resend-verification') ||
-    req.path.startsWith('/api/auth/confirm-email-verified') ||
-    req.path === '/api/payments/webhook'
+    url.includes('/auth/signin') ||
+    url.includes('/auth/signup') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/google/firebase') ||
+    url.includes('/auth/forgot-password') ||
+    url.includes('/auth/reset-password') ||
+    url.includes('/auth/verify-email') ||
+    url.includes('/auth/resend-verification') ||
+    url.includes('/auth/confirm-email-verified') ||
+    url.includes('/auth/csrf-token') ||
+    url === '/api/payments/webhook' ||
+    url.endsWith('/payments/webhook')
   ) {
     return next();
   }

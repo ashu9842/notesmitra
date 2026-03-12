@@ -28,7 +28,8 @@ export const initCsrfToken = async () => {
     const res = await fetch(`${API_BASE_URL}/auth/csrf-token`, { credentials: 'include' });
     if (res.ok) {
       const data = await res.json();
-      if (data?.data?.csrfToken) storeCsrfToken(data.data.csrfToken);
+      // successResponse returns a flat object: { success, csrfToken }
+      if (data?.csrfToken) storeCsrfToken(data.csrfToken);
     }
   } catch {
     // non-critical — CSRF token will be obtained after next auth action
