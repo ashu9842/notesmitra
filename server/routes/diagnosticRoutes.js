@@ -8,6 +8,21 @@ const router = express.Router();
  * Health check for Groq AI configuration and connectivity
  * GET /diagnostic/groq-health
  */
+router.get('/config-check', (req, res) => {
+  try {
+    return res.json({
+      status: 'ok',
+      environment: process.env.NODE_ENV || 'development',
+      groqApiKeyExists: !!config.groqApiKey,
+      groqApiKeyLength: config.groqApiKey ? config.groqApiKey.length : 0,
+      groqApiKeyPreview: config.groqApiKey ? `${config.groqApiKey.slice(0, 10)}...${config.groqApiKey.slice(-5)}` : 'NOT SET',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/groq-health', async (req, res) => {
   try {
     const apiKey = config.groqApiKey;
