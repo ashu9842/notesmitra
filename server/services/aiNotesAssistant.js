@@ -20,6 +20,35 @@ const pdfParseLib = require('pdf-parse');
 // Extract up to 15 000 chars — enough context without overloading smaller models
 const MAX_CHARS = 15_000;
 
+// Detect if text is corrupted/gibberish (too many repeated character patterns, no real words, etc)
+const isCorruptedText = (text) => {
+  if (!text || text.length < 20) return false;
+  
+  // Check 1: Repeated meaningless character patterns (e.g., "aaaaaa", "vvvvv")
+  const repeatedPatterns = /(.)\1{5,}/g;
+  const repeats = text.match(repeatedPatterns) || [];
+  if (repeats.length > text.length / 100) { // More than 1% repeating chars
+    return true;
+  }
+  
+  // Check 2: Excessive consonant clusters without vowels (gibberish indicator)
+  const consonantClusters = /[bcdfghjklmnpqrstvwxyz]{6,}/gi;
+  const clusters = text.match(consonantClusters) || [];
+  if (clusters.length > 3) {
+    return true;
+  }
+  
+  // Check 3: Common words present? If NO real words, it's likely corrupted
+  const realWordPatterns = /\b(the|and|or|is|are|be|was|were|have|has|do|does|will|would|could|should|can|may|might|must|should|this|that|these|those|which|what|who|where|when|why|how|if|as|to|for|in|on|at|by|of|from|with|about|out|into|through|during|before|after|above|below|up|down|between|among|under|over|through|during)\b/gi;
+  const wordMatches = text.match(realWordPatterns) || [];
+  const wordRatio = wordMatches.length / (text.split(/\s+/).length || 1);
+  if (wordRatio < 0.05 && text.length > 100) { // Less than 5% real words
+    return true;
+  }
+  
+  return false;
+};
+
 export const extractText = async (pdfBuffer) => {
   if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) {
     logger.error('❌ extractText: INVALID BUFFER', { 
@@ -35,11 +64,22 @@ export const extractText = async (pdfBuffer) => {
     const data = await pdfParseLib(pdfBuffer);
     const text = (data.text || '').slice(0, MAX_CHARS).trim();
     
+    // Check if extracted text is corrupted/gibberish
+    if (isCorruptedText(text)) {
+      logger.warn('⚠️  extractText: EXTRACTED TEXT IS CORRUPTED', {
+        textLength: text.length,
+        preview: text.substring(0, 100),
+        reason: 'PDF appears to be a scanned image or has encoding issues'
+      });
+      return '';
+    }
+    
     logger.info('✅ extractText: PDF PARSED', {
       finalTextLength: text.length,
       rawTextLength: (data.text || '').length,
       pageCount: data.numpages || 'unknown',
       isEmpty: text.length === 0,
+      isCorrupted: false,
       preview: text.substring(0, 80)
     });
     
@@ -258,9 +298,12 @@ const buildFallbackSummary = (noteText, meta = {}) => {
   const title = meta.title || 'this note';
   const subject = meta.subject || 'this subject';
 
+  // Improved fallback message that indicates PDF issue if no text extracted
   const summary = summarySentences.length
     ? summarySentences.join(' ')
-    : `A concise summary could not be generated from ${title}. This note appears to cover important points for ${subject}. Please review the key topics and quick revision points below.`;
+    : noteText.length === 0
+      ? `⚠️ Unable to extract text from this PDF. The file may be a scanned image, corrupted, or password-protected. Please upload a digital PDF or an OCR-processed version for proper summarization.`
+      : `A concise summary could not be generated from ${title}. This note appears to cover important points for ${subject}. Please review the key topics and quick revision points below.`;
 
   // Build keyTopics with fallback
   const keyTopicsCandidate = lines
