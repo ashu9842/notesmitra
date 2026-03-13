@@ -20,14 +20,37 @@ const pdfParseLib = require('pdf-parse');
 // Extract up to 15 000 chars — enough context without overloading smaller models
 const MAX_CHARS = 15_000;
 
-const extractText = async (pdfBuffer) => {
-  const data = await pdfParseLib(pdfBuffer);
-  const text = (data.text || '').slice(0, MAX_CHARS).trim();
-  logger.debug('extractText completed', {
-    totalChars: text.length,
-    pageCount: data.numpages || 'unknown'
-  });
-  return text;
+export const extractText = async (pdfBuffer) => {
+  if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) {
+    logger.error('extractText: invalid buffer', { 
+      hasBuffer: !!pdfBuffer, 
+      isBuffer: pdfBuffer ? Buffer.isBuffer(pdfBuffer) : false,
+      type: typeof pdfBuffer
+    });
+    return '';
+  }
+
+  try {
+    logger.debug('extractText: starting PDF parse', { bufferSize: pdfBuffer.length });
+    const data = await pdfParseLib(pdfBuffer);
+    const text = (data.text || '').slice(0, MAX_CHARS).trim();
+    
+    logger.info('extractText: PDF parsed successfully', {
+      totalChars: text.length,
+      pageCount: data.numpages || 'unknown',
+      bufferSize: pdfBuffer.length,
+      rawTextLength: (data.text || '').length
+    });
+    
+    return text;
+  } catch (err) {
+    logger.error('extractText: PDF parsing failed', { 
+      error: err.message,
+      bufferSize: pdfBuffer?.length,
+      errorType: err.constructor.name
+    });
+    return '';
+  }
 };
 
 // ─── Summary Caching (Redis) ─────────────────────────────────────────────────
@@ -511,15 +534,23 @@ export const summariseNote = async (pdfBuffer, meta) => {
     return buildFallbackSummary('', meta);
   }
 
-  // If extracted text is too short, cannot generate meaningful summary
-  if (!noteText || noteText.length < 100) {
-    logger.warn('aiNotesAssistant: insufficient text content extracted', { 
+  // If extracted text is too short, warn but still try Groq (some notes are short)
+  if (!noteText) {
+    logger.error('aiNotesAssistant: NO TEXT EXTRACTED from PDF', { 
+      noteTitle: meta.title,
+      bufferSize: pdfBuffer?.length
+    });
+    return buildFallbackSummary('', meta);
+  }
+
+  if (noteText.length < 50) {
+    logger.warn('aiNotesAssistant: very short text content extracted', { 
       textLength: noteText?.length || 0,
       noteTitle: meta.title,
-      minRequired: 100,
-      isEmptyNote: !noteText
+      minDesired: 50,
+      text: noteText.substring(0, 100)
     });
-    return buildFallbackSummary(noteText, meta);
+    // Don't bail out - try Groq anyway with what we have
   }
 
   const apiKey = config.groqApiKey;

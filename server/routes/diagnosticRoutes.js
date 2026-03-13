@@ -434,4 +434,131 @@ router.get('/test-cloudinary-download/:publicId', async (req, res) => {
   }
 });
 
+/**
+ * Test PDF text extraction for a specific note (requires purchase)
+ * POST /diagnostic/test-pdf-extraction/:noteId
+ * Tests: fetch PDF → parse → extract text
+ */
+router.post('/test-pdf-extraction/:noteId', async (req, res) => {
+  try {
+    const { Note, Purchase } = await import('../models/index.js');
+    const userId = req.user?._id;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const note = await Note.findById(req.params.noteId).lean();
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+
+    const purchase = await Purchase.findOne({
+      buyerId: userId,
+      noteId: note._id,
+      status: 'completed'
+    });
+
+    if (!purchase) {
+      return res.status(403).json({ error: 'You must purchase this note' });
+    }
+
+    const diagnostics = {
+      noteId: note._id,
+      noteTitle: note.title,
+      storageType: note.storageType,
+      timestamp: new Date().toISOString(),
+      steps: []
+    };
+
+    // Step 1: Fetch PDF buffer
+    const fs = (await import('fs')).default;
+    const { downloadCloudinaryFile } = await import('../config/cloudinary.js');
+    const { extractText } = await import('../services/aiNotesAssistant.js');
+    
+    let pdfBuffer;
+    try {
+      if (note.storageType === 'cloudinary' && note.cloudinaryPublicId) {
+        const response = await downloadCloudinaryFile(note.cloudinaryPublicId);
+        if (!response?.ok) {
+          diagnostics.steps.push({
+            step: '1. Cloudinary Download',
+            status: 'FAILED',
+            httpStatus: response?.status,
+            reason: `HTTP ${response?.status}: ${response?.statusText}`
+          });
+          return res.status(400).json({ ...diagnostics, error: 'Cloudinary download failed' });
+        }
+        pdfBuffer = Buffer.from(await response.arrayBuffer());
+        diagnostics.steps.push({
+          step: '1. Cloudinary Download',
+          status: 'OK',
+          bufferSize: pdfBuffer.length
+        });
+      } else if (note.filePath && fs.existsSync(note.filePath)) {
+        pdfBuffer = fs.readFileSync(note.filePath);
+        diagnostics.steps.push({
+          step: '1. Local File Read',
+          status: 'OK',
+          bufferSize: pdfBuffer.length,
+          filePath: note.filePath
+        });
+      } else {
+        diagnostics.steps.push({
+          step: '1. PDF Fetch',
+          status: 'FAILED',
+          reason: 'No valid storage location (not Cloudinary, file not found locally)'
+        });
+        return res.status(400).json({ ...diagnostics, error: 'Could not locate PDF file' });
+      }
+    } catch (err) {
+      diagnostics.steps.push({
+        step: '1. PDF Fetch',
+        status: 'ERROR',
+        error: err.message,
+        errorType: err.constructor.name
+      });
+      return res.status(500).json({ ...diagnostics, error: err.message });
+    }
+
+    // Step 2: Extract text from PDF
+    let extractedText = '';
+    try {
+      extractedText = await extractText(pdfBuffer);
+
+      diagnostics.steps.push({
+        step: '2. PDF Text Extraction',
+        status: extractedText && extractedText.length > 0 ? 'OK' : 'EMPTY',
+        textLength: extractedText ? extractedText.length : 0,
+        textPreview: extractedText ? extractedText.substring(0, 150) : '(empty)',
+        isEmpty: !extractedText || extractedText.length === 0
+      });
+    } catch (err) {
+      diagnostics.steps.push({
+        step: '2. PDF Text Extraction',
+        status: 'ERROR',
+        error: err.message,
+        errorType: err.constructor.name
+      });
+      return res.status(500).json({ ...diagnostics, error: err.message });
+    }
+
+    // Step 3: Evaluate text quality
+    const textLen = extractedText ? extractedText.length : 0;
+    diagnostics.evaluation = {
+      canGenerateSummary: textLen > 0,
+      textQuality: textLen > 500 ? 'GOOD' : textLen > 100 ? 'MINIMAL' : textLen > 0 ? 'VERY_SHORT' : 'EMPTY',
+      recommendation: textLen < 50 ? 'PDF may be corrupted, empty, or too short to summarize' : 'Ready for AI processing'
+    };
+
+    return res.json(diagnostics);
+  } catch (err) {
+    logger.error('test-pdf-extraction error:', err.message);
+    return res.status(500).json({
+      error: err.message,
+      errorType: err.constructor.name
+    });
+  }
+});
+
 export default router;
