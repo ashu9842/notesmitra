@@ -133,7 +133,7 @@ export function AINoteAssistant({ note }: AINoteAssistantProps) {
             <p className="text-base font-semibold text-purple-900">AI Study Assistant</p>
             <p className="text-xs font-normal text-muted-foreground truncate max-w-[260px]">{note.title}</p>
           </div>
-          <Badge className="ml-auto bg-purple-100 text-purple-700 border-purple-300 text-xs">Powered by Gemini</Badge>
+          <Badge className="ml-auto bg-purple-100 text-purple-700 border-purple-300 text-xs">Powered by Groq</Badge>
         </CardTitle>
 
         {/* Tab switcher */}
@@ -166,7 +166,7 @@ export function AINoteAssistant({ note }: AINoteAssistantProps) {
             {isSummaryLoading && (
               <div className="flex flex-col items-center gap-3 py-10 text-purple-600">
                 <Loader2 className="w-8 h-8 animate-spin" />
-                <p className="text-sm font-medium">Gemini is reading your notes…</p>
+                <p className="text-sm font-medium">Groq is reading your notes…</p>
                 <p className="text-xs text-muted-foreground">This may take 10–20 seconds</p>
               </div>
             )}

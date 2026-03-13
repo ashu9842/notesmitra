@@ -373,7 +373,7 @@ const buildFallbackChatAnswer = (noteText, question, meta = {}) => {
     : '- I could not extract enough text from this note to provide a targeted answer.';
 
   return [
-    `Gemini is temporarily unavailable, so here is a quick answer from the note text (${meta.title || 'this note'}):`,
+    `Groq AI is temporarily unavailable, so here is a quick answer from the note text (${meta.title || 'this note'}):`,
     '',
     bulletPoints,
     '',
