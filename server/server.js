@@ -51,6 +51,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import razorpayRoutes from './routes/razorpayRoutes.js';
 import superadminRoutes from './routes/superadminRoutes.js';
 import premiumRoutes from './routes/premiumRoutes.js';
+import diagnosticRoutes from './routes/diagnosticRoutes.js';
 
 // Initialize express app
 const app = express();
@@ -322,6 +323,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/premium', premiumRoutes);
 app.use('/api/razorpay', razorpayRoutes);
+app.use('/api/diagnostic', diagnosticRoutes);
 
 // Root route
 app.get('/', (req, res) => {
