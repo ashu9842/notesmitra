@@ -1,7 +1,7 @@
 /**
- * Gemini AI-Powered PDF Quality Checker
+ * Groq AI-Powered PDF Quality Checker
  *
- * Uses Google Gemini to analyse extracted PDF text and evaluate ALL 5 checks:
+ * Uses Groq Mixtral to analyse extracted PDF text and evaluate ALL 5 checks:
  *   1. Blank Page Check       – content is too sparse / near-empty
  *   2. Low Quality Scan       – garbled OCR, unreadable text
  *   3. Copyright Check        – contains copyrighted / pirated material
@@ -12,12 +12,12 @@
  * because they require DB access / simple arithmetic, not content analysis.
  *
  * Falls back to rule-based checkers when:
- *   - GEMINI_API_KEY is not set
- *   - Gemini returns an unexpected / invalid response
+ *   - GROQ_API_KEY is not set
+ *   - Groq returns an unexpected / invalid response
  *   - Any network / API error occurs
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import { createRequire } from 'module';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
@@ -69,16 +69,16 @@ const extractText = async (pdfBuffer) => {
  * @param {number} totalChars      – Non-whitespace character count
  * @returns {{ blankPage, quality, copyright }}
  */
-const analyseWithGemini = async (extractedText, pageCount, totalChars) => {
-  const apiKey = config.geminiApiKey;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
+const analyseWithGroq = async (extractedText, pageCount, totalChars) => {
+  const apiKey = config.groqApiKey;
+  if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
 
-  const genAI = new GoogleGenerativeAI(apiKey);
+  const groq = new Groq({ apiKey });
   // Model fallback chain — skip overloaded/rate-limited models automatically
-  // Using the newest officially available Gemini models
+  // Using Groq's most capable models
   const MODEL_CHAIN = [
-    'gemini-2.0-flash',
-    'gemini-1.5-pro',
+    'mixtral-8x7b-32768',  // Primary: fast & capable
+    'llama2-70b-4096',     // Fallback: more powerful
   ];
 
   const avgCharsPerPage = pageCount > 0 ? Math.round(totalChars / pageCount) : 0;
@@ -171,35 +171,31 @@ Rules for each check:
 
 Respond with the JSON object only.`;
 
+
   let raw;
   let lastErr;
   for (const modelName of MODEL_CHAIN) {
     try {
       logger.debug(`geminiQualityChecker: trying model ${modelName}`);
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
+      const result = await groq.chat.completions.create({
+        model: modelName,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1500,
+        top_p: 1
+      });
       
-      // Handle various response formats
-      let text;
-      if (result.response?.text && typeof result.response.text === 'function') {
-        text = result.response.text();
-      } else if (result.response?.text && typeof result.response.text === 'string') {
-        text = result.response.text;
-      } else if (typeof result.response === 'string') {
-        text = result.response;
-      } else if (result.text && typeof result.text === 'function') {
-        text = result.text();
-      } else if (result.text && typeof result.text === 'string') {
-        text = result.text;
-      }
-      
+      // Extract text from Groq response
+      let text = result?.choices?.[0]?.message?.content;
       text = typeof text === 'string' ? text.trim() : null;
       
       if (!text) {
-        logger.warn(`geminiQualityChecker: ${modelName} returned empty response`, {
-          responseKeys: result.response ? Object.keys(result.response) : 'no response',
-          hasText: !!result.response?.text
-        });
+        logger.warn(`geminiQualityChecker: ${modelName} returned empty response`);
         throw new Error(`Empty response from ${modelName}`);
       }
       
@@ -208,12 +204,11 @@ Respond with the JSON object only.`;
       break; // success
     } catch (err) {
       const errStr = String(err.message || err).toLowerCase();
-      const statusMatch = err.status || parseInt(err.message?.match(/\b(4\d{2}|5\d{2})\b/)?.[0], 10);
-      const statusCode = typeof statusMatch === 'number' ? statusMatch : null;
+      const statusCode = err.status || null;
       
       // Check for specific error types
       const isAuthError = errStr.includes('api key') || errStr.includes('unauthorized') || errStr.includes('403') || errStr.includes('401');
-      const isRateLimited = errStr.includes('503') || errStr.includes('429') || errStr.includes('overloaded') || statusCode === 503 || statusCode === 429;
+      const isRateLimited = errStr.includes('429') || errStr.includes('overloaded') || statusCode === 429;
       const isTimeout = errStr.includes('timeout') || errStr.includes('econnrefused');
       const isInvalidModel = (errStr.includes('404') && errStr.includes('model')) || errStr.includes('not found');
       
@@ -341,10 +336,10 @@ export const runGeminiChecks = async (pdfBuffer) => {
     return runRuleBasedFallback(pdfBuffer, `text extraction failed: ${err.message}`);
   }
 
-  // ── Gemini analysis ──────────────────────────────────────────────────────
+  // ── Groq analysis ──────────────────────────────────────────────────────
   try {
-    // Single Gemini call covers all 5 checks
-    const ai = await analyseWithGemini(extracted.text, extracted.pageCount, extracted.totalChars);
+    // Single Groq call covers all 5 checks
+    const ai = await analyseWithGroq(extracted.text, extracted.pageCount, extracted.totalChars);
 
     logger.info('geminiQualityChecker: All 5 AI checks completed', {
       blankPage:  ai.blankPage.passed,

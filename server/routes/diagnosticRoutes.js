@@ -1,52 +1,51 @@
 import express from 'express';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
 /**
- * Health check for Gemini AI configuration and connectivity
- * GET /diagnostic/gemini-health
+ * Health check for Groq AI configuration and connectivity
+ * GET /diagnostic/groq-health
  */
-router.get('/gemini-health', async (req, res) => {
+router.get('/groq-health', async (req, res) => {
   try {
-    const apiKey = config.geminiApiKey;
+    const apiKey = config.groqApiKey;
     
     if (!apiKey) {
       return res.status(500).json({
         status: 'error',
-        message: 'GEMINI_API_KEY is not configured',
+        message: 'GROQ_API_KEY is not configured',
         apiKeySet: false,
         models: []
       });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const groq = new Groq({ apiKey });
     
-    // Try to list available models first
-    let availableModels = [];
-    try {
-      const modelsList = await genAI.listModels();
-      availableModels = modelsList.map(m => m.name.replace('models/', ''));
-      logger.info('Available Gemini models:', availableModels);
-    } catch (err) {
-      logger.warn('Could not list models:', err.message);
-    }
-
-    const modelsToTest = availableModels.length > 0 
-      ? availableModels.slice(0, 3)  // Use first 3 available
-      : ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-pro'];  // Fallback
+    // Groq models to test
+    const modelsToTest = [
+      'mixtral-8x7b-32768',
+      'llama2-70b-4096',
+    ];
 
     const results = [];
 
     for (const modelName of modelsToTest) {
       try {
-        const model = genAI.getGenerativeModel({ model: modelName });
-        const result = await model.generateContent(
-          'Say "OK" if you can hear me.'
-        );
-        const text = result.response?.text?.();
+        const result = await groq.chat.completions.create({
+          model: modelName,
+          messages: [
+            {
+              role: 'user',
+              content: 'Say "OK" if you can hear me.'
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 50
+        });
+        const text = result?.choices?.[0]?.message?.content;
         
         results.push({
           model: modelName,
@@ -54,7 +53,7 @@ router.get('/gemini-health', async (req, res) => {
           response: text?.slice?.(0, 100) || 'no response',
           error: null
         });
-        logger.info(`gemini-health: ${modelName} is working`);
+        logger.info(`groq-health: ${modelName} is working`);
       } catch (err) {
         results.push({
           model: modelName,
@@ -62,23 +61,20 @@ router.get('/gemini-health', async (req, res) => {
           response: null,
           error: err.message?.slice?.(0, 200) || String(err)
         });
-        logger.error(`gemini-health: ${modelName} failed`, { error: err.message });
+        logger.error(`groq-health: ${modelName} failed`, { error: err.message });
       }
     }
 
-    const workingModels = results.filter(r => r.status === 'working').length;
-    const allWorking = workingModels > 0;
 
     return res.status(allWorking ? 200 : 206).json({
       status: allWorking ? 'healthy' : 'degraded',
       message: `${workingModels}/${modelsToTest.length} models responding`,
       apiKeySet: true,
-      availableModels: availableModels.length > 0 ? availableModels : 'could not list',
       models: results,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
-    logger.error('gemini-health: diagnostic failed', { error: err.message });
+    logger.error('groq-health: diagnostic failed', { error: err.message });
     return res.status(500).json({
       status: 'error',
       message: 'Diagnostic test failed',

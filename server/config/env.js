@@ -195,7 +195,16 @@ const envSchema = {
     }
   },
 
-  // Gemini AI
+  // Groq AI (primary - free tier friendly)
+  groq: {
+    GROQ_API_KEY: {
+      required: false,
+      default: null,
+      errorMsg: 'GROQ_API_KEY for AI summaries (free tier: 40K tokens/month)'
+    }
+  },
+
+  // Gemini AI (fallback)
   gemini: {
     GEMINI_API_KEY: {
       required: false,
@@ -360,6 +369,9 @@ const loadConfig = () => {
 
       // Gemini AI
       geminiApiKey: config.gemini.GEMINI_API_KEY,
+
+      // Groq AI
+      groqApiKey: config.groq.GROQ_API_KEY,
 
       // Firebase Admin SDK
       firebaseProjectId: config.firebase.FIREBASE_PROJECT_ID,
