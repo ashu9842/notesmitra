@@ -1117,15 +1117,47 @@ export const pdfProxy = async (req, res, next) => {
  * Returns null if the file cannot be retrieved.
  */
 const fetchNotePdfBuffer = async (note) => {
-  if (note.storageType === 'cloudinary' && note.cloudinaryPublicId) {
-    const upstream = await downloadCloudinaryFile(note.cloudinaryPublicId);
-    if (!upstream.ok) return null;
-    return Buffer.from(await upstream.arrayBuffer());
+  try {
+    if (note.storageType === 'cloudinary' && note.cloudinaryPublicId) {
+      try {
+        const upstream = await downloadCloudinaryFile(note.cloudinaryPublicId);
+        if (!upstream?.ok) {
+          logger.warn('fetchNotePdfBuffer: Cloudinary response not ok', {
+            status: upstream?.status,
+            statusText: upstream?.statusText,
+            publicId: note.cloudinaryPublicId
+          });
+          return null;
+        }
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        logger.debug('fetchNotePdfBuffer: Cloudinary PDF downloaded', { bufferSize: buffer.length });
+        return buffer;
+      } catch (cloudinaryErr) {
+        logger.warn('fetchNotePdfBuffer: Cloudinary fetch failed', { 
+          error: cloudinaryErr.message,
+          publicId: note.cloudinaryPublicId
+        });
+        return null;
+      }
+    }
+    
+    if (note.filePath && fs.existsSync(note.filePath)) {
+      const buffer = fs.readFileSync(note.filePath);
+      logger.debug('fetchNotePdfBuffer: Local file read', { bufferSize: buffer.length, filePath: note.filePath });
+      return buffer;
+    }
+    
+    logger.warn('fetchNotePdfBuffer: No valid storage location', { 
+      storageType: note.storageType,
+      hasCloudinaryId: !!note.cloudinaryPublicId,
+      hasFilePath: !!note.filePath,
+      filePathExists: note.filePath ? fs.existsSync(note.filePath) : false
+    });
+    return null;
+  } catch (err) {
+    logger.error('fetchNotePdfBuffer: unexpected error', { error: err.message });
+    return null;
   }
-  if (note.filePath && fs.existsSync(note.filePath)) {
-    return fs.readFileSync(note.filePath);
-  }
-  return null;
 };
 
 // @desc    Generate an AI exam-ready summary for a purchased note

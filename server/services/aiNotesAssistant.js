@@ -408,19 +408,33 @@ const buildFallbackChatAnswer = (noteText, question, meta = {}) => {
 export const summariseNote = async (pdfBuffer, meta) => {
   let noteText = '';
   try {
+    logger.debug('summariseNote: starting', { 
+      bufferSize: pdfBuffer?.length,
+      meta: { title: meta?.title, subject: meta?.subject }
+    });
+    
     noteText = await extractText(pdfBuffer);
+    
+    logger.debug('summariseNote: text extracted', { 
+      extractedLength: noteText.length,
+      title: meta.title
+    });
   } catch (err) {
-    logger.error('aiNotesAssistant: text extraction failed', { error: err.message?.slice?.(0, 180) || String(err) });
+    logger.error('aiNotesAssistant: text extraction failed', { 
+      error: err.message?.slice?.(0, 180) || String(err),
+      bufferSize: pdfBuffer?.length
+    });
     return buildFallbackSummary('', meta);
   }
 
-  if (!noteText || noteText.length < 50) {
+  // If extracted text is too short, cannot generate meaningful summary
+  if (!noteText || noteText.length < 100) {
     logger.warn('aiNotesAssistant: insufficient text content extracted', { 
       textLength: noteText?.length || 0,
       noteTitle: meta.title,
+      minRequired: 100,
       isEmptyNote: !noteText
     });
-    // Return a proper fallback with at least some data instead of empty arrays
     return buildFallbackSummary(noteText, meta);
   }
 
