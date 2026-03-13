@@ -77,10 +77,10 @@ const setCachedSummary = async (noteText, title, subject, summary) => {
 
 // ─── Model fallback chain ────────────────────────────────────────────────────
 // Tries models in order; skips any that return 503 (overloaded) or 429 (quota).
-// Using Groq models - free tier with 40K tokens/month, no daily limits
+// Using Groq's current available models - fast & free
 const MODEL_CHAIN = [
-  'mixtral-8x7b-32768',  // Primary: fast & capable (1M context)
-  'llama2-70b-4096',     // Fallback: more powerful
+  'llama-3.1-70b-versatile',  // Primary: powerful & fast
+  'llama-3.1-8b-instant',     // Fallback: lightweight & quick
 ];
 
 const generateWithFallback = async (apiKey, promptOrContents) => {

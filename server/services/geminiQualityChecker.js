@@ -84,10 +84,10 @@ const analyseWithGroq = async (extractedText, pageCount, totalChars) => {
 
   const groq = new Groq({ apiKey });
   // Model fallback chain — skip overloaded/rate-limited models automatically
-  // Using Groq's most capable models
+  // Using Groq's current available models
   const MODEL_CHAIN = [
-    'mixtral-8x7b-32768',  // Primary: fast & capable
-    'llama2-70b-4096',     // Fallback: more powerful
+    'llama-3.1-70b-versatile',  // Primary: powerful & fast
+    'llama-3.1-8b-instant',     // Fallback: lightweight & quick
   ];
 
   const avgCharsPerPage = pageCount > 0 ? Math.round(totalChars / pageCount) : 0;
