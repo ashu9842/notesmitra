@@ -10,64 +10,14 @@ const router = express.Router();
  */
 router.get('/groq-health', async (req, res) => {
   try {
-    // Step 1: Check API key
-    const apiKey = config.groqApiKey;
-    logger.info('DEBUG: groq-health baseline check', { hasApiKey: !!apiKey });
-    
-    if (!apiKey) {
-      return res.json({
-        step: 1,
-        status: 'error',
-        message: 'GROQ_API_KEY not found in config'
-      });
-    }
-
-    // Step 2: Try to import Groq
-    logger.info('DEBUG: attempting to import groq-sdk...');
-    let Groq;
-    try {
-      const mod = await import('groq-sdk');
-      logger.info('DEBUG: import succeeded, checking exports...', { keys: Object.keys(mod) });
-      Groq = mod.default || mod.Groq || mod;
-    } catch (importErr) {
-      logger.error('DEBUG: import failed', { error: importErr.message, stack: importErr.stack });
-      return res.json({
-        step: 2,
-        status: 'error',
-        message: 'Groq SDK import failed',
-        error: importErr.message
-      });
-    }
-
-    logger.info('DEBUG: Groq object status', { isNull: !Groq, isFunc: typeof Groq === 'function' });
-
-    if (!Groq || typeof Groq !== 'function') {
-      return res.json({
-        step: 3,
-        status: 'error',
-        message: 'Groq is not a function',
-        groqType: typeof Groq
-      });
-    }
-
-    // Step 3: Try to instantiate
-    logger.info('DEBUG: creating Groq instance...');
-    const groq = new Groq({ apiKey });
-    logger.info('DEBUG: Groq instance created successfully');
-
     return res.json({
-      step: 4,
-      status: 'success',
-      message: 'Groq ready for testing',
+      status: 'debug',
+      apiKey: config.groqApiKey ? 'SET' : 'NOT SET',
+      configs: Object.keys(config).slice(0, 10),
       timestamp: new Date().toISOString()
     });
   } catch (err) {
-    logger.error('groq-health error:', { message: err.message, stack: err.stack });
-    return res.status(500).json({
-      status: 'error',
-      error: err.message,
-      stack: err.stack?.split('\n').slice(0, 5)
-    });
+    return res.status(500).json({ error: err.message });
   }
 });
 
