@@ -10,90 +10,63 @@ const router = express.Router();
  */
 router.get('/groq-health', async (req, res) => {
   try {
+    // Step 1: Check API key
     const apiKey = config.groqApiKey;
+    logger.info('DEBUG: groq-health baseline check', { hasApiKey: !!apiKey });
     
     if (!apiKey) {
-      return res.status(500).json({
+      return res.json({
+        step: 1,
         status: 'error',
-        message: 'GROQ_API_KEY is not configured',
-        apiKeySet: false,
-        models: []
+        message: 'GROQ_API_KEY not found in config'
       });
     }
 
-    // Lazy load Groq to avoid crashes if SDK not available
+    // Step 2: Try to import Groq
+    logger.info('DEBUG: attempting to import groq-sdk...');
     let Groq;
     try {
-      const groqModule = await import('groq-sdk');
-      Groq = groqModule.default;
-    } catch (err) {
-      logger.error('groq-health: Failed to import Groq SDK', { error: err.message });
-      return res.status(500).json({
+      const mod = await import('groq-sdk');
+      logger.info('DEBUG: import succeeded, checking exports...', { keys: Object.keys(mod) });
+      Groq = mod.default || mod.Groq || mod;
+    } catch (importErr) {
+      logger.error('DEBUG: import failed', { error: importErr.message, stack: importErr.stack });
+      return res.json({
+        step: 2,
         status: 'error',
-        message: 'Groq SDK failed to load',
-        error: err.message || 'Import failed'
+        message: 'Groq SDK import failed',
+        error: importErr.message
       });
     }
 
-    const groq = new Groq({ apiKey });
-    
-    // Groq models to test
-    const modelsToTest = [
-      'mixtral-8x7b-32768',
-      'llama2-70b-4096',
-    ];
+    logger.info('DEBUG: Groq object status', { isNull: !Groq, isFunc: typeof Groq === 'function' });
 
-    const results = [];
-
-    for (const modelName of modelsToTest) {
-      try {
-        const result = await groq.chat.completions.create({
-          model: modelName,
-          messages: [
-            {
-              role: 'user',
-              content: 'Say "OK" if you can hear me.'
-            }
-          ],
-          temperature: 0.5,
-          max_tokens: 50
-        });
-        const text = result?.choices?.[0]?.message?.content;
-        
-        results.push({
-          model: modelName,
-          status: 'working',
-          response: text?.slice?.(0, 100) || 'no response',
-          error: null
-        });
-        logger.info(`groq-health: ${modelName} is working`);
-      } catch (err) {
-        results.push({
-          model: modelName,
-          status: 'error',
-          response: null,
-          error: err.message?.slice?.(0, 200) || String(err)
-        });
-        logger.error(`groq-health: ${modelName} failed`, { error: err.message });
-      }
+    if (!Groq || typeof Groq !== 'function') {
+      return res.json({
+        step: 3,
+        status: 'error',
+        message: 'Groq is not a function',
+        groqType: typeof Groq
+      });
     }
 
-    const workingModels = results.filter(r => r.status === 'working').length;
-    const allWorking = workingModels > 0;
+    // Step 3: Try to instantiate
+    logger.info('DEBUG: creating Groq instance...');
+    const groq = new Groq({ apiKey });
+    logger.info('DEBUG: Groq instance created successfully');
 
-    return res.status(allWorking ? 200 : 206).json({
-      status: allWorking ? 'healthy' : 'degraded',
-      message: `${workingModels}/${modelsToTest.length} models responding`,
-      apiKeySet: true,
-      models: results,
+    return res.json({
+      step: 4,
+      status: 'success',
+      message: 'Groq ready for testing',
       timestamp: new Date().toISOString()
     });
   } catch (err) {
-    logger.error('groq-health: diagnostic failed', { error: err.message });
+    logger.error('groq-health error:', { message: err.message, stack: err.stack });
     return res.status(500).json({
       status: 'error',
-      message: 'Diagnostic test failed',
-      error: err.message?.slice?.(0, 200) || String(err)
+      error: err.message,
+      stack: err.stack?.split('\n').slice(0, 5)
     });
   }
 });
