@@ -798,11 +798,40 @@ export const downloadNote = async (req, res, next) => {
     }
 
     // Check if user purchased this note
-    const purchase = await Purchase.findOne({
+    let purchase = await Purchase.findOne({
       buyerId: req.user._id,
       noteId: note._id,
       status: 'completed'
     });
+
+    if (!purchase) {
+      const reconciledPurchase = await Purchase.findOneAndUpdate(
+        {
+          buyerId: req.user._id,
+          noteId: note._id,
+          paymentMethod: 'razorpay',
+          razorpayPaymentId: { $exists: true, $ne: null },
+          status: { $in: ['pending', 'processing'] }
+        },
+        {
+          status: 'completed',
+          purchasedAt: new Date()
+        },
+        {
+          new: true,
+          sort: { createdAt: -1 }
+        }
+      );
+
+      if (reconciledPurchase) {
+        purchase = reconciledPurchase;
+        logger.warn('downloadNote: reconciled non-completed Razorpay purchase', {
+          purchaseId: reconciledPurchase._id,
+          noteId: note._id,
+          userId: req.user?._id
+        });
+      }
+    }
 
     if (!purchase) {
       return res.status(403).json({

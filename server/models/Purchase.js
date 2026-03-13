@@ -76,7 +76,7 @@ purchaseSchema.index({ status: 1 });
 purchaseSchema.index({ createdAt: -1 });
 
 const allowedTransitions = {
-  pending: ['processing', 'failed'],
+  pending: ['processing', 'completed', 'failed'],
   processing: ['completed', 'failed'],
   completed: ['refunded'],
   failed: [],

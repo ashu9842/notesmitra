@@ -420,6 +420,26 @@ export const verifyNotePayment = async (req, res, next) => {
       buyerId: req.user._id
     });
     if (alreadyProcessed) {
+      if (alreadyProcessed.status !== 'completed') {
+        const reconciledPurchase = await Purchase.findOneAndUpdate(
+          {
+            _id: alreadyProcessed._id,
+            status: { $in: ['pending', 'processing'] }
+          },
+          {
+            status: 'completed',
+            purchasedAt: alreadyProcessed.purchasedAt || new Date()
+          },
+          { new: true }
+        );
+
+        return res.status(200).json({
+          success: true,
+          message: 'Payment already verified',
+          purchase: reconciledPurchase || alreadyProcessed
+        });
+      }
+
       return res.status(200).json({
         success: true,
         message: 'Payment already verified',

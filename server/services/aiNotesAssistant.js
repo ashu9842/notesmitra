@@ -28,31 +28,63 @@ const extractText = async (pdfBuffer) => {
 
 // ─── Model fallback chain ────────────────────────────────────────────────────
 // Tries models in order; skips any that return 503 (overloaded) or 429 (quota).
+// Updated to use only validated, currently-available Gemini models.
 const MODEL_CHAIN = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-flash-latest',
-  'gemini-flash-lite-latest',
-  'gemini-2.5-flash-lite',
   'gemini-1.5-flash-latest',
+  'gemini-1.5-flash',
+  'gemini-pro',
 ];
 
 const generateWithFallback = async (apiKey, promptOrContents) => {
   const genAI = new GoogleGenerativeAI(apiKey);
   let lastErr;
+  
   for (const modelName of MODEL_CHAIN) {
     try {
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(promptOrContents);
-      return result.response.text().trim();
+      const text = result.response?.text?.();
+      if (!text) {
+        throw new Error(`Empty response from ${modelName}`);
+      }
+      logger.info(`aiNotesAssistant: ${modelName} succeeded`);
+      return text.trim();
     } catch (err) {
-      const isRetryable = err.message.includes('503') || err.message.includes('429') || err.message.includes('overloaded');
-      logger.warn(`aiNotesAssistant: model ${modelName} failed (${isRetryable ? 'retryable' : 'fatal'})`, { error: err.message.slice(0, 120) });
+      const errStr = String(err.message || err).toLowerCase();
+      const statusCode = err.status || (err.message?.match(/\b(4\d{2}|5\d{2})\b/) || [])[0];
+      const isRetryable = 
+        errStr.includes('503') || 
+        errStr.includes('429') || 
+        errStr.includes('overloaded') ||
+        errStr.includes('timeout') ||
+        statusCode === 503 ||
+        statusCode === 429;
+      
+      logger.warn(
+        `aiNotesAssistant: ${modelName} failed (${isRetryable ? 'retryable' : 'fatal'})`,
+        { 
+          error: err.message?.slice?.(0, 180) || String(err),
+          status: statusCode
+        }
+      );
+      
       lastErr = err;
-      if (!isRetryable) break; // don't retry on 404 / auth errors
+      
+      // Stop retrying on auth/not-found errors (401, 403, 404)
+      if (!isRetryable && (statusCode === 401 || statusCode === 403 || statusCode === 404)) {
+        logger.error(`aiNotesAssistant: fatal error, stopping retry chain`, { status: statusCode });
+        break;
+      }
+      
+      // Continue to next model if retryable
+      if (!isRetryable) {
+        // Non-retryable but not auth error — try next model anyway
+        continue;
+      }
     }
   }
-  throw lastErr;
+  
+  throw lastErr || new Error('All Gemini models failed or API key is invalid');
 };
 
 const toCleanLines = (text) => {
@@ -198,11 +230,12 @@ export const summariseNote = async (pdfBuffer, meta) => {
   try {
     noteText = await extractText(pdfBuffer);
   } catch (err) {
-    logger.warn('aiNotesAssistant: text extraction failed, using fallback summary', { error: err.message?.slice?.(0, 180) || String(err) });
+    logger.error('aiNotesAssistant: text extraction failed', { error: err.message?.slice?.(0, 180) || String(err) });
     return buildFallbackSummary('', meta);
   }
 
   if (!noteText || noteText.length < 50) {
+    logger.warn('aiNotesAssistant: insufficient text content extracted');
     return {
       summary: 'Not enough text content could be extracted from this note.',
       keyTopics: [],
@@ -212,7 +245,7 @@ export const summariseNote = async (pdfBuffer, meta) => {
 
   const apiKey = config.geminiApiKey;
   if (!apiKey) {
-    logger.warn('aiNotesAssistant: GEMINI_API_KEY is missing, using fallback summary');
+    logger.error('aiNotesAssistant: GEMINI_API_KEY is missing or empty');
     return buildFallbackSummary(noteText, meta);
   }
 
@@ -245,9 +278,15 @@ Rules:
 
   try {
     const raw = await generateWithFallback(apiKey, prompt);
-    return parseSummaryFromModelOutput(raw, noteText, meta);
+    const parsed = parseSummaryFromModelOutput(raw, noteText, meta);
+    logger.info('aiNotesAssistant: summariseNote generated successfully');
+    return parsed;
   } catch (err) {
-    logger.warn('aiNotesAssistant: summariseNote failed, using fallback summary', { error: err.message.slice(0, 180) });
+    logger.error('aiNotesAssistant: summariseNote failed, using fallback', { 
+      error: err.message?.slice?.(0, 200) || String(err),
+      hasNoteText: !!noteText,
+      noteTextLength: noteText?.length || 0
+    });
     return buildFallbackSummary(noteText, meta);
   }
 };
@@ -263,13 +302,13 @@ export const chatAboutNote = async (pdfBuffer, meta, question, history = []) => 
   try {
     noteText = await extractText(pdfBuffer);
   } catch (err) {
-    logger.warn('aiNotesAssistant: text extraction failed, using fallback chat response', { error: err.message?.slice?.(0, 180) || String(err) });
+    logger.error('aiNotesAssistant: text extraction failed for chat', { error: err.message?.slice?.(0, 180) || String(err) });
     return buildFallbackChatAnswer('', question, meta);
   }
 
   const apiKey = config.geminiApiKey;
   if (!apiKey) {
-    logger.warn('aiNotesAssistant: GEMINI_API_KEY is missing, using fallback chat response');
+    logger.error('aiNotesAssistant: GEMINI_API_KEY is missing or empty for chat');
     return buildFallbackChatAnswer(noteText, question, meta);
   }
 
@@ -307,9 +346,18 @@ Rules:
 
   try {
     const answer = await generateWithFallback(apiKey, { contents });
-    return answer || buildFallbackChatAnswer(noteText, question, meta);
+    if (!answer || !answer.trim()) {
+      logger.warn('aiNotesAssistant: empty response from chat, using fallback');
+      return buildFallbackChatAnswer(noteText, question, meta);
+    }
+    logger.info('aiNotesAssistant: chatAboutNote answered successfully');
+    return answer;
   } catch (err) {
-    logger.warn('aiNotesAssistant: chatAboutNote failed, using fallback chat response', { error: err.message.slice(0, 180) });
+    logger.error('aiNotesAssistant: chatAboutNote failed, using fallback', { 
+      error: err.message?.slice?.(0, 200) || String(err),
+      hasNoteText: !!noteText,
+      questionLength: question?.length || 0
+    });
     return buildFallbackChatAnswer(noteText, question, meta);
   }
 };
