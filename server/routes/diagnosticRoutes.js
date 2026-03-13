@@ -23,10 +23,24 @@ router.get('/gemini-health', async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const models = ['gemini-2.0-flash', 'gemini-1.5-pro'];
+    
+    // Try to list available models first
+    let availableModels = [];
+    try {
+      const modelsList = await genAI.listModels();
+      availableModels = modelsList.map(m => m.name.replace('models/', ''));
+      logger.info('Available Gemini models:', availableModels);
+    } catch (err) {
+      logger.warn('Could not list models:', err.message);
+    }
+
+    const modelsToTest = availableModels.length > 0 
+      ? availableModels.slice(0, 3)  // Use first 3 available
+      : ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-pro'];  // Fallback
+
     const results = [];
 
-    for (const modelName of models) {
+    for (const modelName of modelsToTest) {
       try {
         const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(
@@ -53,12 +67,13 @@ router.get('/gemini-health', async (req, res) => {
     }
 
     const workingModels = results.filter(r => r.status === 'working').length;
-    const allWorking = workingModels === models.length;
+    const allWorking = workingModels > 0;
 
     return res.status(allWorking ? 200 : 206).json({
       status: allWorking ? 'healthy' : 'degraded',
-      message: `${workingModels}/${models.length} models responding`,
+      message: `${workingModels}/${modelsToTest.length} models responding`,
       apiKeySet: true,
+      availableModels: availableModels.length > 0 ? availableModels : 'could not list',
       models: results,
       timestamp: new Date().toISOString()
     });
