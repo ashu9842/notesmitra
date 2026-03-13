@@ -23,6 +23,10 @@ const MAX_CHARS = 15_000;
 const extractText = async (pdfBuffer) => {
   const data = await pdfParseLib(pdfBuffer);
   const text = (data.text || '').slice(0, MAX_CHARS).trim();
+  logger.debug('extractText completed', {
+    totalChars: text.length,
+    pageCount: data.numpages || 'unknown'
+  });
   return text;
 };
 
@@ -96,16 +100,29 @@ const toCleanLines = (text) => {
   return text
     .split(/\r?\n/)
     .map((line) => line.replace(/^[-*•\d.)\s]+/, '').trim())
-    .filter((line) => line.length >= 12);
+    .filter((line) => line.length >= 8); // Reduced from 12 to capture more content
 };
 
 const toSentences = (text) => {
   if (!text) return [];
-  return text
+  
+  // Try standard sentence split first
+  const standardSplit = text
     .replace(/\s+/g, ' ')
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 25);
+    .filter((s) => s.length >= 15); // More lenient
+  
+  // If we got sentences, return them
+  if (standardSplit.length > 0) return standardSplit;
+  
+  // Fallback: split by common delimiters if no standard sentences found
+  const fallbackSplit = text
+    .split(/[;:,]|\n/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 15);
+  
+  return fallbackSplit;
 };
 
 const uniqueKeepOrder = (items) => {
@@ -133,21 +150,51 @@ const buildFallbackSummary = (noteText, meta = {}) => {
     ? summarySentences.join(' ')
     : `A concise summary could not be generated from ${title}. This note appears to cover important points for ${subject}. Please review the key topics and quick revision points below.`;
 
-  const keyTopics = uniqueKeepOrder(
-    lines
-      .filter((line) => line.length <= 90)
-      .slice(0, 10)
-  );
+  // Build keyTopics with fallback
+  const keyTopicsCandidate = lines
+    .filter((line) => line.length <= 90)
+    .slice(0, 10);
+  
+  const keyTopics = keyTopicsCandidate.length 
+    ? keyTopicsCandidate 
+    : (sentences.slice(0, 5).map(s => s.split(/\s+/).slice(0, 5).join(' ')));
 
-  const quickRevision = uniqueKeepOrder(
-    [...sentences.slice(0, 8), ...lines.slice(0, 8)]
+  // Build quickRevision with multiple fallback strategies
+  const candidateRevisionItems = [
+    ...sentences.slice(0, 8),
+    ...lines.slice(0, 8),
+    ...(noteText.split(/[.\n;:]/g).filter(x => x.trim().length >= 15).slice(0, 8))
+  ];
+
+  let quickRevision = uniqueKeepOrder(
+    candidateRevisionItems
       .map((item) => item.length > 170 ? `${item.slice(0, 167)}...` : item)
-      .filter((item) => item.length >= 20)
+      .filter((item) => item.length >= 15) // More lenient minimum length
   ).slice(0, 12);
+
+  // If still empty, create basic revision points from note title/subject
+  if (quickRevision.length === 0 && (title || subject)) {
+    quickRevision = [
+      `Topic: ${title || subject}`,
+      'Refer to the note content for detailed information',
+      'Review key sections carefully before exam'
+    ];
+  }
+
+  // Log what we're returning
+  if (quickRevision.length === 0) {
+    logger.warn('buildFallbackSummary: quickRevision is empty', {
+      linesCount: lines.length,
+      sentencesCount: sentences.length,
+      noteTextLength: noteText?.length || 0,
+      title,
+      subject
+    });
+  }
 
   return {
     summary,
-    keyTopics,
+    keyTopics: keyTopics.slice(0, 10),
     quickRevision,
   };
 };
@@ -239,12 +286,13 @@ export const summariseNote = async (pdfBuffer, meta) => {
   }
 
   if (!noteText || noteText.length < 50) {
-    logger.warn('aiNotesAssistant: insufficient text content extracted');
-    return {
-      summary: 'Not enough text content could be extracted from this note.',
-      keyTopics: [],
-      quickRevision: [],
-    };
+    logger.warn('aiNotesAssistant: insufficient text content extracted', { 
+      textLength: noteText?.length || 0,
+      noteTitle: meta.title,
+      isEmptyNote: !noteText
+    });
+    // Return a proper fallback with at least some data instead of empty arrays
+    return buildFallbackSummary(noteText, meta);
   }
 
   const apiKey = config.geminiApiKey;
@@ -283,7 +331,12 @@ Rules:
   try {
     const raw = await generateWithFallback(apiKey, prompt);
     const parsed = parseSummaryFromModelOutput(raw, noteText, meta);
-    logger.info('aiNotesAssistant: summariseNote generated successfully');
+    logger.info('aiNotesAssistant: summariseNote generated successfully', {
+      source: 'ai-generated',
+      quickRevisionCount: parsed.quickRevision?.length || 0,
+      keyTopicsCount: parsed.keyTopics?.length || 0,
+      summaryLength: parsed.summary?.length || 0
+    });
     return parsed;
   } catch (err) {
     logger.error('aiNotesAssistant: summariseNote failed, using fallback', { 
@@ -291,7 +344,13 @@ Rules:
       hasNoteText: !!noteText,
       noteTextLength: noteText?.length || 0
     });
-    return buildFallbackSummary(noteText, meta);
+    const fallback = buildFallbackSummary(noteText, meta);
+    logger.info('aiNotesAssistant: returning fallback summary', {
+      source: 'fallback',
+      quickRevisionCount: fallback.quickRevision?.length || 0,
+      keyTopicsCount: fallback.keyTopics?.length || 0
+    });
+    return fallback;
   }
 };
 
