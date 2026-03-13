@@ -76,11 +76,13 @@ const setCachedSummary = async (noteText, title, subject, summary) => {
 };
 
 // ─── Model fallback chain ────────────────────────────────────────────────────
-// Tries models in order; skips any that return 503 (overloaded) or 429 (quota).
+// Tries models in order; skips any that are decommissioned or return 429 (quota).
 // Using Groq's current available models - fast & free
+// Last verified: llama-3.1-8b-instant is stable, mixtral/llama70b decommissioned
+// Chain continues even if a model is decommissioned (treated as retryable error)
 const MODEL_CHAIN = [
-  'llama-3.1-70b-versatile',  // Primary: powerful & fast
-  'llama-3.1-8b-instant',     // Fallback: lightweight & quick
+  'mixtral-8x7b-32768',       // May be deprecated, but worth trying first
+  'llama-3.1-8b-instant',     // Confirmed working - always fallback
 ];
 
 const generateWithFallback = async (apiKey, promptOrContents) => {
@@ -137,10 +139,12 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
       const isAuthError = errStr.includes('api key') || errStr.includes('unauthorized') || errStr.includes('403') || errStr.includes('401');
       const isRateLimited = errStr.includes('429') || errStr.includes('overloaded') || statusCode === 429;
       const isTimeout = errStr.includes('timeout') || errStr.includes('econnrefused') || errStr.includes('deadline');
-      const isInvalidModel = errStr.includes('model') && errStr.includes('not found');
+      const isInvalidModel = errStr.includes('model') && (errStr.includes('not found') || errStr.includes('does not exist'));
+      const isDecommissioned = errStr.includes('decommissioned') || errStr.includes('no longer supported');
       
-      const isRetryable = isRateLimited || isTimeout;
-      const isFatal = isAuthError || isInvalidModel;
+      // Decommissioned models should be retried, not treated as fatal
+      const isRetryable = isRateLimited || isTimeout || isDecommissioned;
+      const isFatal = isAuthError || (isInvalidModel && !isDecommissioned);
       
       logger.warn(
         `aiNotesAssistant: ${modelName} failed (${isRetryable ? 'retryable' : isFatal ? 'fatal-auth' : 'non-fatal'})`,
@@ -148,13 +152,13 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
           fullError: err.message?.slice?.(0, 300) || String(err),
           status: statusCode,
           modelName,
-          errorType: { isAuthError, isRateLimited, isTimeout, isInvalidModel }
+          errorType: { isAuthError, isRateLimited, isTimeout, isInvalidModel, isDecommissioned }
         }
       );
       
       lastErr = err;
       
-      // Stop retrying immediately on auth/API key/model errors
+      // Stop retrying immediately on auth/API key errors only
       if (isFatal) {
         logger.error(`aiNotesAssistant: fatal error, stopping retry chain`, { 
           status: statusCode,
@@ -164,7 +168,7 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
         break;
       }
       
-      // Continue to next model if retryable or non-fatal error
+      // Continue to next model if retryable or non-fatal error (including decommissioned)
     }
   }
   

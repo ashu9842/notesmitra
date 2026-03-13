@@ -83,11 +83,12 @@ const analyseWithGroq = async (extractedText, pageCount, totalChars) => {
   }
 
   const groq = new Groq({ apiKey });
-  // Model fallback chain — skip overloaded/rate-limited models automatically
+  // Model fallback chain — skip overloaded/rate-limited/decommissioned models automatically
   // Using Groq's current available models
+  // Last verified: llama-3.1-8b-instant is stable, older models decommissioned
   const MODEL_CHAIN = [
-    'llama-3.1-70b-versatile',  // Primary: powerful & fast
-    'llama-3.1-8b-instant',     // Fallback: lightweight & quick
+    'mixtral-8x7b-32768',       // May be deprecated, but worth trying first
+    'llama-3.1-8b-instant',     // Confirmed working - always fallback
   ];
 
   const avgCharsPerPage = pageCount > 0 ? Math.round(totalChars / pageCount) : 0;
@@ -219,15 +220,16 @@ Respond with the JSON object only.`;
       const isAuthError = errStr.includes('api key') || errStr.includes('unauthorized') || errStr.includes('403') || errStr.includes('401');
       const isRateLimited = errStr.includes('429') || errStr.includes('overloaded') || statusCode === 429;
       const isTimeout = errStr.includes('timeout') || errStr.includes('econnrefused');
-      const isInvalidModel = (errStr.includes('404') && errStr.includes('model')) || errStr.includes('not found');
+      const isInvalidModel = (errStr.includes('404') && errStr.includes('model')) || errStr.includes('does not exist');
+      const isDecommissioned = errStr.includes('decommissioned') || errStr.includes('no longer supported');
       
-      const isRetryable = isRateLimited || isTimeout;
-      const isFatal = isAuthError || isInvalidModel;
+      const isRetryable = isRateLimited || isTimeout || isDecommissioned;
+      const isFatal = isAuthError || (isInvalidModel && !isDecommissioned);
       
-      logger.warn(`geminiQualityChecker: ${modelName} failed (${isRetryable ? 'retryable' : isFatal ? 'fatal-auth' : 'fatal'})`, { 
+      logger.warn(`geminiQualityChecker: ${modelName} failed (${isRetryable ? 'retryable' : isFatal ? 'fatal-auth' : 'non-fatal'})`, { 
         error: err.message?.slice?.(0, 200) || String(err),
         status: statusCode,
-        errorType: { isAuthError, isRateLimited, isTimeout, isInvalidModel }
+        errorType: { isAuthError, isRateLimited, isTimeout, isInvalidModel, isDecommissioned }
       });
       
       lastErr = err;
