@@ -50,7 +50,7 @@ router.get('/groq-health', async (req, res) => {
     }
 
     const groq = new Groq({ apiKey });
-    const modelsToTest = ['llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
+    const modelsToTest = ['mixtral-8x7b-32768', 'llama-3.1-8b-instant'];
     const results = [];
 
     for (const modelName of modelsToTest) {
