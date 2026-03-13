@@ -51,33 +51,31 @@ router.post('/test-summary-pipeline', async (req, res) => {
 
     // Step 4: Call Groq API with actual content
     const modelName = 'llama-3.1-8b-instant';
-    const testPrompt = `You are creating exam study notes. Return ONLY JSON.
-
-Content: ${text}
-
-Note title: ${title || 'Notes'}
-Subject: ${subject || 'General'}
-
-Generate JSON with 5-8 keyTopics and 8-10 quickRevision points:
-
-{
-  "summary": "2-3 sentence overview of the main concepts covered in this material.",
-  "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5", "Topic 6", "Topic 7"],
-  "quickRevision": ["Point 1", "Point 2", "Point 3", "Point 4", "Point 5", "Point 6", "Point 7", "Point 8", "Point 9", "Point 10"]
-}
-
-RULES:
-- Return ONLY JSON object, no code fences or markdown
-- keyTopics must have 5-8 different topics from the content
-- quickRevision must have 8-10 different facts/formulas/definitions from the content
-- All strings must be in simple, exam-study language`;
-
+    
     let groqResponse;
     try {
       groqResponse = await groq.chat.completions.create({
         model: modelName,
-        messages: [{ role: 'user', content: testPrompt }],
-        temperature: 0.7,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a JSON response generator. IMPORTANT: Respond with ONLY valid JSON object. NO markdown. NO code fences. NO explanations. NO text before or after. Return raw valid JSON only.'
+          },
+          {
+            role: 'user',
+            content: `CONTENT: ${text}
+
+CREATE THIS EXACT JSON WITH NO OTHER TEXT:
+{
+  "summary": "Write 2-3 sentences summarizing the main content concepts.",
+  "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5", "Topic 6", "Topic 7", "Topic 8"],
+  "quickRevision": ["Fact 1", "Fact 2", "Fact 3", "Fact 4", "Fact 5", "Fact 6", "Fact 7", "Fact 8", "Fact 9", "Fact 10"]
+}
+
+NEVER ADD MARKDOWN, CODE FENCES, OR ANY TEXT OUTSIDE THE JSON.`
+          }
+        ],
+        temperature: 0.3,
         max_tokens: 500,
         top_p: 1
       });
@@ -166,21 +164,21 @@ router.post('/test-raw-groq', async (req, res) => {
     }
 
     const groq = new Groq({ apiKey });
-    const prompt = `You are a study assistant. Create a structured summary with JSON format.
-    
-Provide response as:
-{
-  "summary": "Brief overview",
-  "keyTopics": ["topic1", "topic2"],
-  "quickRevision": ["point1", "point2"]
-}`;
-
     const modelName = 'llama-3.1-8b-instant';
     const result = await groq.chat.completions.create({
       model: modelName,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 500,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a JSON generator. Respond with ONLY a JSON object. No markdown. No explanations. No code fences. No extra text. Return this exact format:'
+        },
+        {
+          role: 'user',
+          content: '{"summary": "Brief overview", "keyTopics": ["topic1", "topic2"], "quickRevision": ["point1", "point2"]}'
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 300,
       top_p: 1
     });
 

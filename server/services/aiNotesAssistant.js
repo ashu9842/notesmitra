@@ -105,13 +105,17 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
         model: modelName,
         messages: [
           {
+            role: 'system',
+            content: 'You are a JSON response generator. IMPORTANT: Respond with ONLY valid JSON object. NO markdown. NO code fences. NO explanations. NO text before or after. Return raw valid JSON only.'
+          },
+          {
             role: 'user',
             content: typeof promptOrContents === 'string' 
               ? promptOrContents 
               : (promptOrContents[0]?.text || 'summarize this')
           }
         ],
-        temperature: 0.7,
+        temperature: 0.3,
         max_tokens: 2000,
         top_p: 1
       });
@@ -444,26 +448,16 @@ export const summariseNote = async (pdfBuffer, meta) => {
     return buildFallbackSummary(noteText, meta);
   }
 
-  const prompt = `You are creating exam study notes. Return ONLY JSON.
+  const prompt = `CONTENT: ${noteText}
 
-Content: ${noteText}
-
-Note title: ${meta.title || 'Notes'}
-Subject: ${meta.subject || 'General'}
-
-Generate JSON with 5-8 keyTopics and 8-10 quickRevision points:
-
+CREATE THIS EXACT JSON WITH NO OTHER TEXT:
 {
-  "summary": "2-3 sentence overview of the main concepts covered in this material.",
-  "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5", "Topic 6", "Topic 7"],
-  "quickRevision": ["Point 1", "Point 2", "Point 3", "Point 4", "Point 5", "Point 6", "Point 7", "Point 8", "Point 9", "Point 10"]
+  "summary": "Write 2-3 sentences summarizing the main content concepts.",
+  "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5", "Topic 6", "Topic 7", "Topic 8"],
+  "quickRevision": ["Fact 1", "Fact 2", "Fact 3", "Fact 4", "Fact 5", "Fact 6", "Fact 7", "Fact 8", "Fact 9", "Fact 10"]
 }
 
-RULES:
-- Return ONLY JSON object, no code fences or markdown
-- keyTopics must have 5-8 different topics from the content
-- quickRevision must have 8-10 different facts/formulas/definitions from the content
-- All strings must be in simple, exam-study language`;
+NEVER ADD MARKDOWN, CODE FENCES, OR ANY TEXT OUTSIDE THE JSON.`;
 
   try {
     // ✅ CHECK CACHE FIRST
