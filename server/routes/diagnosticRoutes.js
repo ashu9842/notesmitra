@@ -327,4 +327,99 @@ router.post('/test-summary', async (req, res) => {
   }
 });
 
+/**
+ * Test Cloudinary file download
+ * GET /diagnostic/test-cloudinary-download/:publicId
+ */
+router.get('/test-cloudinary-download/:publicId', async (req, res) => {
+  try {
+    const { publicId } = req.params;
+    logger.info('test-cloudinary-download: starting', { publicId });
+
+    // Import the download function
+    const { downloadCloudinaryFile } = await import('../config/cloudinary.js');
+
+    const diagnostics = {
+      publicId,
+      timestamp: new Date().toISOString(),
+      steps: []
+    };
+
+    // Step 1: Check if downloadCloudinaryFile exists
+    if (!downloadCloudinaryFile || typeof downloadCloudinaryFile !== 'function') {
+      diagnostics.steps.push({ step: '1. Download Function Check', status: 'FAIL', error: 'Function not found' });
+      return res.status(500).json({ ...diagnostics, error: 'downloadCloudinaryFile not available' });
+    }
+    diagnostics.steps.push({ step: '1. Download Function Check', status: 'OK' });
+
+    // Step 2: Attempt download
+    let response;
+    try {
+      response = await downloadCloudinaryFile(publicId);
+      diagnostics.steps.push({
+        step: '2. Cloudinary Fetch',
+        status: response?.ok ? 'OK' : 'FAIL',
+        httpStatus: response?.status,
+        statusText: response?.statusText,
+        headers: {
+          contentType: response?.headers?.get?.('content-type'),
+          contentLength: response?.headers?.get?.('content-length')
+        }
+      });
+    } catch (err) {
+      diagnostics.steps.push({
+        step: '2. Cloudinary Fetch',
+        status: 'ERROR',
+        error: err.message,
+        errorType: err.constructor.name
+      });
+      return res.status(500).json({ ...diagnostics, error: `Fetch failed: ${err.message}` });
+    }
+
+    if (!response?.ok) {
+      diagnostics.steps.push({
+        step: '3. Response Validation',
+        status: 'FAIL',
+        error: `HTTP ${response.status}: ${response.statusText}`
+      });
+      return res.status(response.status || 400).json({ ...diagnostics, error: `Download failed with status ${response.status}` });
+    }
+
+    // Step 3: Read response body
+    let buffer;
+    try {
+      const arrayBuffer = await response.arrayBuffer();
+      buffer = Buffer.from(arrayBuffer);
+      diagnostics.steps.push({
+        step: '3. Buffer Extraction',
+        status: 'OK',
+        bufferSize: buffer.length,
+        bufferType: buffer.constructor.name
+      });
+    } catch (err) {
+      diagnostics.steps.push({
+        step: '3. Buffer Extraction',
+        status: 'ERROR',
+        error: err.message
+      });
+      return res.status(500).json({ ...diagnostics, error: `Buffer extraction failed: ${err.message}` });
+    }
+
+    diagnostics.result = {
+      status: 'SUCCESS',
+      bufferSize: buffer.length,
+      isBuffer: Buffer.isBuffer(buffer),
+      firstBytes: buffer.slice(0, 20).toString('hex')
+    };
+
+    return res.json(diagnostics);
+  } catch (err) {
+    logger.error('test-cloudinary-download error:', err.message);
+    return res.status(500).json({
+      error: err.message,
+      stack: err.stack?.split('\n').slice(0, 3)
+    });
+  }
+});
+
 export default router;

@@ -444,32 +444,54 @@ export const summariseNote = async (pdfBuffer, meta) => {
     return buildFallbackSummary(noteText, meta);
   }
 
-  const prompt = `You are an expert academic tutor helping students prepare for exams.
-Analyse the following study notes and create a comprehensive exam-ready summary.
+  const prompt = `You are an expert academic tutor creating exam preparation materials.
 
-Note Title: ${meta.title || 'Study Notes'}
+IMPORTANT: You MUST respond with ONLY valid JSON (no markdown, no explanations, no code fences).
+
+Analyze the following study material and create a comprehensive exam-ready summary:
+
+Title: ${meta.title || 'Study Notes'}
 Subject: ${meta.subject || 'General'}
 
---- NOTE CONTENT START ---
+Content:
 ${noteText}
---- NOTE CONTENT END ---
 
-Respond with ONLY a raw JSON object (no markdown, no code fences). The JSON must have exactly these fields:
-
+YOU MUST RESPOND WITH ONLY THIS JSON FORMAT:
 {
-  "summary": "A clear 3-5 paragraph overview of the entire content, written in simple language easy to understand just before an exam.",
-  "keyTopics": ["topic 1", "topic 2", "topic 3", ...],
+  "summary": "Write a 3-5 paragraph comprehensive overview of the entire content, explaining all major concepts clearly for exam preparation.",
+  "keyTopics": [
+    "List 5-10 important topics/concepts covered in the content",
+    "Each topic should be a distinct concept or principle",
+    "Include the most frequently tested material",
+    "Add subtopics and related concepts",
+    "Include key definitions and frameworks",
+    "Add important historical context if relevant",
+    "Include methodology or processes explained",
+    "Add any important limitations or exceptions"
+  ],
   "quickRevision": [
-    "One-line key fact or formula that must be remembered",
-    ...
+    "Fact 1: Write as a complete sentence or formula to memorize",
+    "Fact 2: Another key fact or definition in simple language",
+    "Fact 3: Important date, law, theorem, or principle",
+    "Fact 4: Another crucial concept in one line",
+    "Fact 5: Key relationship or cause-effect",
+    "Fact 6: Important classification or category",
+    "Fact 7: Formula or equation to remember",
+    "Fact 8: Another key fact or concept",
+    "Fact 9: Critical exception or special case",
+    "Fact 10: Another important memory point",
+    "Fact 11: Final key fact for exam",
+    "Fact 12: One more critical revision point"
   ]
 }
 
-Rules:
-- keyTopics: list the 5-10 most important topics/concepts covered
-- quickRevision: 8-15 bite-sized memory points — definitions, formulas, important dates, laws, theorems, etc.
-- Write everything from the student's perspective (exam-focused)
-- Do NOT include any key not listed above`;
+REQUIREMENTS:
+- summary: Must be 3-5 sentences minimum, each explaining major concepts
+- keyTopics: MUST contain 5-10 items (not less, not more than the content allows)
+- quickRevision: MUST contain 8-15 memory points (not less than 8)
+- All fields MUST be non-empty strings or arrays
+- Use simple, exam-focused language
+- DO NOT include any keys other than summary, keyTopics, quickRevision`;
 
   try {
     // ✅ CHECK CACHE FIRST
