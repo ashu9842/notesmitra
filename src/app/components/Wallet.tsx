@@ -28,9 +28,10 @@ interface WalletProps {
   isLoading?: boolean;
   errorMessage?: string | null;
   totalEarningsOverride?: number;
+  availableBalanceOverride?: number;
 }
 
-export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, isAdmin = false, isLoading = false, errorMessage, totalEarningsOverride }: WalletProps) {
+export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, isAdmin = false, isLoading = false, errorMessage, totalEarningsOverride, availableBalanceOverride }: WalletProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const handleRefresh = useCallback(async () => {
     if (!onRefresh || isRefreshing) return;
@@ -61,9 +62,10 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
     : transactions;
 
   const amount = parseFloat(withdrawAmount) || 0;
+  const effectiveAvailableBalance = Math.max(0, Number(availableBalanceOverride ?? balance));
   const isValidAmount = isAdmin 
-    ? amount >= 100 && amount <= Math.min(balance, 1000)
-    : amount >= 100 && amount <= Math.min(balance, 500);
+    ? amount >= 100 && amount <= Math.min(effectiveAvailableBalance, 1000)
+    : amount >= 100 && amount <= Math.min(effectiveAvailableBalance, 500);
 
   const handleWithdraw = async () => {
     const amount = parseFloat(withdrawAmount);
@@ -83,7 +85,7 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
       return;
     }
 
-    if (amount > balance) {
+    if (amount > effectiveAvailableBalance) {
       toast.error(formatClientErrorMessage("Insufficient balance"));
       return;
     }
@@ -170,7 +172,7 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
               <div>
                 <p className="text-xs font-medium text-muted-foreground">Available Balance</p>
                 <p className="text-2xl font-extrabold tracking-tight text-emerald-700 dark:text-emerald-400 mt-0.5">
-                  {showBalance ? `₹${balance.toFixed(2)}` : "₹••••••"}
+                  {showBalance ? `₹${effectiveAvailableBalance.toFixed(2)}` : "₹••••••"}
                 </p>
               </div>
             </div>
@@ -295,7 +297,7 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
             <CardTitle>Withdraw Funds</CardTitle>
             <Dialog open={isWithdrawDialogOpen} onOpenChange={setIsWithdrawDialogOpen}>
               <DialogTrigger asChild>
-                <Button disabled={balance <= 0}>
+                <Button disabled={effectiveAvailableBalance <= 0}>
                   <IndianRupee className="w-4 h-4 mr-2" />
                   Withdraw
                 </Button>
@@ -304,7 +306,7 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
                 <DialogHeader>
                   <DialogTitle>Withdraw to UPI / Bank</DialogTitle>
                   <DialogDescription>
-                    Available Balance: ₹{balance.toFixed(2)}
+                    Available Balance: ₹{effectiveAvailableBalance.toFixed(2)}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
@@ -322,7 +324,7 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
                       className={
                         withdrawAmount && amount > 0 && amount < 100
                           ? "border-red-500 focus-visible:ring-red-500"
-                          : withdrawAmount && (amount > balance || amount > (isAdmin ? 1000 : 500))
+                          : withdrawAmount && (amount > effectiveAvailableBalance || amount > (isAdmin ? 1000 : 500))
                           ? "border-red-500 focus-visible:ring-red-500"
                           : ""
                       }
@@ -337,12 +339,12 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
                         ⚠ Maximum withdrawal amount is ₹{isAdmin ? "1000" : "500"}
                       </p>
                     )}
-                    {withdrawAmount && amount > balance && amount <= (isAdmin ? 1000 : 500) && (
+                    {withdrawAmount && amount > effectiveAvailableBalance && amount <= (isAdmin ? 1000 : 500) && (
                       <p className="text-xs text-red-600">
                         ⚠ Amount exceeds available balance
                       </p>
                     )}
-                    {(!withdrawAmount || (amount >= 100 && amount <= Math.min(balance, isAdmin ? 1000 : 500))) && (
+                    {(!withdrawAmount || (amount >= 100 && amount <= Math.min(effectiveAvailableBalance, isAdmin ? 1000 : 500))) && (
                       <p className="text-xs text-muted-foreground">
                         Minimum: ₹100 • Maximum: ₹{isAdmin ? "1000" : "500"}
                       </p>

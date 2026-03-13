@@ -316,6 +316,7 @@ export default function App() {
 
   const [purchasedNotes, setPurchasedNotes] = useState<string[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [walletWithdrawableBalance, setWalletWithdrawableBalance] = useState<number | null>(null);
   const [adminWalletBalance, setAdminWalletBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
@@ -600,10 +601,13 @@ export default function App() {
       const data = await walletAPI.get();
       const balance = data.wallet?.balance || 0;
       setWalletBalance(balance);
+      const available = Number(data.withdrawableBalance ?? balance);
+      setWalletWithdrawableBalance(Number.isFinite(available) ? available : balance);
       if (currentUser?.role === "admin") {
         setAdminWalletBalance(balance);
       }
     } catch (error: any) {
+      setWalletWithdrawableBalance(null);
       if (currentUser) {
         const raw = error.message || "Failed to load wallet";
         const message = raw === '__SERVER_STARTING__' ? 'Server is starting up. Please refresh in a moment.' : raw;
@@ -759,6 +763,7 @@ export default function App() {
   useEffect(() => {
     if (!currentUser) {
       setWalletBalance(0);
+      setWalletWithdrawableBalance(null);
       setTransactions([]);
       setPurchasedNotes([]);
       setSupportTickets([]);
@@ -1928,6 +1933,8 @@ export default function App() {
                     onRefresh={loadTransactions}
                     isLoading={isLoadingWallet}
                     errorMessage={walletError}
+                    totalEarningsOverride={sellerStats.totalEarnings}
+                    availableBalanceOverride={walletWithdrawableBalance ?? walletBalance}
                   />
                 </TabsContent>
 

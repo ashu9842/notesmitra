@@ -1,7 +1,43 @@
 import Wallet from '../models/Wallet.js';
 import User from '../models/User.js';
+import Purchase from '../models/Purchase.js';
+import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import { ROLES } from '../config/constants.js';
+
+const getSellerWithdrawableBalance = async ({ userId, wallet }) => {
+  if (!wallet) return 0;
+
+  const sellerId =
+    typeof userId === 'string' && mongoose.Types.ObjectId.isValid(userId)
+      ? new mongoose.Types.ObjectId(userId)
+      : userId;
+
+  const [earningsSummary] = await Purchase.aggregate([
+    { $match: { sellerId, status: 'completed' } },
+    { $group: { _id: null, totalEarnings: { $sum: '$sellerEarnings' } } }
+  ]);
+
+  const totalEarnings = Number(earningsSummary?.totalEarnings || 0);
+
+  const completedWithdrawals = (wallet.transactions || []).reduce((sum, transaction) => {
+    const description = String(transaction.description || '').toLowerCase();
+    const isWithdrawal = transaction.type === 'debit' && description.includes('withdrawal');
+
+    if (!isWithdrawal || transaction.status !== 'completed') {
+      return sum;
+    }
+
+    return sum + Number(transaction.amount || 0);
+  }, 0);
+
+  const withdrawable = Math.max(
+    0,
+    Math.min(Number(wallet.balance || 0), totalEarnings - completedWithdrawals)
+  );
+
+  return Number(withdrawable.toFixed(2));
+};
 
 // @desc    Get user wallet
 // @route   GET /api/wallet
@@ -29,9 +65,18 @@ export const getWallet = async (req, res, next) => {
       });
     }
 
+    let withdrawableBalance = Number(wallet.balance || 0);
+    if (req.user?.role === ROLES.SELLER) {
+      withdrawableBalance = await getSellerWithdrawableBalance({
+        userId: req.user._id,
+        wallet
+      });
+    }
+
     res.status(200).json({
       success: true,
-      wallet
+      wallet,
+      withdrawableBalance
     });
   } catch (error) {
     next(error);
@@ -139,8 +184,16 @@ export const withdrawFunds = async (req, res, next) => {
     const wallet = await Wallet.findOne({ userId: req.user._id });
     if (!wallet) return res.status(404).json({ success: false, error: 'Wallet not found' });
 
-    if (wallet.balance < parsedAmount) {
-      return res.status(400).json({ success: false, error: 'Insufficient balance' });
+    let availableBalance = Number(wallet.balance || 0);
+    if (req.user?.role === ROLES.SELLER) {
+      availableBalance = await getSellerWithdrawableBalance({
+        userId: req.user._id,
+        wallet
+      });
+    }
+
+    if (availableBalance < parsedAmount) {
+      return res.status(400).json({ success: false, error: 'Insufficient available balance' });
     }
 
     const transaction = {

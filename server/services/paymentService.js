@@ -729,12 +729,12 @@ export const getPurchasesService = async ({ userId, page = 1, limit = 10 }) => {
 };
 
 export const getSalesService = async (userId) => {
-  const sales = await Purchase.find({ sellerId: userId })
+  const sales = await Purchase.find({ sellerId: userId, status: 'completed' })
     .populate('noteId', 'title subject semester price')
     .populate('buyerId', 'name email')
     .sort({ createdAt: -1 });
 
-  const totalEarnings = sales.reduce((sum, sale) => sum + sale.sellerEarnings, 0);
+  const totalEarnings = sales.reduce((sum, sale) => sum + Number(sale.sellerEarnings || 0), 0);
 
   return {
     statusCode: 200,
