@@ -23,7 +23,7 @@ router.get('/gemini-health', async (req, res) => {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const models = ['gemini-pro', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro'];
     const results = [];
 
     for (const modelName of models) {

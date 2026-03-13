@@ -75,9 +75,8 @@ const analyseWithGemini = async (extractedText, pageCount, totalChars) => {
 
   const genAI = new GoogleGenerativeAI(apiKey);
   // Model fallback chain — skip overloaded/rate-limited models automatically
-  // Using officially available Gemini models
+  // Using the most stable, officially available Gemini model
   const MODEL_CHAIN = [
-    'gemini-pro',
     'gemini-1.5-flash',
     'gemini-1.5-pro',
   ];
