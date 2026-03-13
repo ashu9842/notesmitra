@@ -130,10 +130,10 @@ const toCleanLines = (text) => {
 const toSentences = (text) => {
   if (!text) return [];
   
-  // Try standard sentence split first
+  // Split by sentence boundaries (. ! ?) - compatible with older Node versions
   const standardSplit = text
     .replace(/\s+/g, ' ')
-    .split(/(?<=[.!?])\s+/)
+    .split(/[.!?]+/) // Split on sentence endings
     .map((s) => s.trim())
     .filter((s) => s.length >= 15); // More lenient
   
@@ -142,7 +142,7 @@ const toSentences = (text) => {
   
   // Fallback: split by common delimiters if no standard sentences found
   const fallbackSplit = text
-    .split(/[;:,]|\n/)
+    .split(/[;:,\n]+/)
     .map((s) => s.trim())
     .filter((s) => s.length >= 15);
   
