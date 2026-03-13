@@ -49,14 +49,28 @@ router.post('/test-summary-pipeline', async (req, res) => {
     const groq = new Groq({ apiKey });
     diagnostics.steps.push({ step: '3. Groq Client Creation', status: 'OK' });
 
-    // Step 4: Call Groq API
+    // Step 4: Call Groq API with actual content
     const modelName = 'llama-3.1-8b-instant';
-    const testPrompt = `You are a study assistant. Respond with ONLY a JSON object (no markdown):
+    const testPrompt = `You are creating exam study notes. Return ONLY JSON.
+
+Content: ${text}
+
+Note title: ${title || 'Notes'}
+Subject: ${subject || 'General'}
+
+Generate JSON with 5-8 keyTopics and 8-10 quickRevision points:
+
 {
-  "summary": "Brief summary",
-  "keyTopics": ["topic1", "topic2"],
-  "quickRevision": ["point1", "point2", "point3"]
-}`;
+  "summary": "2-3 sentence overview of the main concepts covered in this material.",
+  "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5", "Topic 6", "Topic 7"],
+  "quickRevision": ["Point 1", "Point 2", "Point 3", "Point 4", "Point 5", "Point 6", "Point 7", "Point 8", "Point 9", "Point 10"]
+}
+
+RULES:
+- Return ONLY JSON object, no code fences or markdown
+- keyTopics must have 5-8 different topics from the content
+- quickRevision must have 8-10 different facts/formulas/definitions from the content
+- All strings must be in simple, exam-study language`;
 
     let groqResponse;
     try {
