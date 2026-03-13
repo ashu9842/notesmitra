@@ -34,6 +34,8 @@ const router = express.Router();
 
 // Google sign-in via Firebase ID token — NOT rate-limited (short-lived token, one-shot)
 router.post('/google/firebase', firebaseGoogleAuth);
+// Backward-compat endpoint used by older clients
+router.post('/google', firebaseGoogleAuth);
 // Email verification link (browser redirect — not rate-limited)
 router.get('/verify-email/:token', verifyEmail);
 

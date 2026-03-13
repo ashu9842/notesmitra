@@ -367,6 +367,29 @@ export const verifyNotePayment = async (req, res, next) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, noteId } = req.body;
 
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !noteId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing payment verification fields'
+      });
+    }
+
+    // Idempotency guard first: if purchase is already completed, return success
+    // even if client retries with stale/partial signature payload.
+    const alreadyPurchased = await Purchase.findOne({
+      buyerId: req.user._id,
+      noteId,
+      status: 'completed'
+    });
+
+    if (alreadyPurchased) {
+      return res.status(200).json({
+        success: true,
+        message: 'Purchase already completed',
+        purchase: alreadyPurchased
+      });
+    }
+
     // Verify signature
     const sign = razorpay_order_id + '|' + razorpay_payment_id;
     const expectedSign = crypto
@@ -392,11 +415,15 @@ export const verifyNotePayment = async (req, res, next) => {
     }
 
     // Guard against double-spend: reject if this payment was already processed
-    const alreadyProcessed = await Purchase.findOne({ razorpayPaymentId: razorpay_payment_id });
+    const alreadyProcessed = await Purchase.findOne({
+      razorpayPaymentId: razorpay_payment_id,
+      buyerId: req.user._id
+    });
     if (alreadyProcessed) {
-      return res.status(409).json({
-        success: false,
-        error: 'This payment has already been processed'
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already verified',
+        purchase: alreadyProcessed
       });
     }
 
@@ -407,9 +434,10 @@ export const verifyNotePayment = async (req, res, next) => {
       status: 'completed'
     });
     if (existingPurchase) {
-      return res.status(409).json({
-        success: false,
-        error: 'You have already purchased this note'
+      return res.status(200).json({
+        success: true,
+        message: 'Purchase already completed',
+        purchase: existingPurchase
       });
     }
 

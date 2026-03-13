@@ -72,7 +72,7 @@ export function PaymentDialog({ isOpen, onClose, amount, planName, onPaymentSucc
           try {
             // Verify payment
             await razorpayAPI.verifyWalletPayment(
-              orderId,
+              response.razorpay_order_id,
               response.razorpay_payment_id,
               response.razorpay_signature
             );
@@ -85,7 +85,7 @@ export function PaymentDialog({ isOpen, onClose, amount, planName, onPaymentSucc
               toast.success(`${planName} activated successfully!`);
             }, 1500);
           } catch (error) {
-            toast.error(formatClientErrorMessage('Payment verification failed. Please contact support.'));
+            toast.error(formatClientErrorMessage(error, 'Payment verification failed. Please contact support.'));
           }
         },
         prefill: {

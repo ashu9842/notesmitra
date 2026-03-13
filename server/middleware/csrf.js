@@ -46,6 +46,7 @@ export const requireCsrf = (req, res, next) => {
     url.includes('/auth/signup') ||
     url.includes('/auth/refresh') ||
     url.includes('/auth/google/firebase') ||
+    url.includes('/auth/google') ||
     url.includes('/auth/forgot-password') ||
     url.includes('/auth/reset-password') ||
     url.includes('/auth/verify-email') ||

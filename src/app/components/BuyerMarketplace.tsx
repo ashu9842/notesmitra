@@ -175,6 +175,35 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
   const handleRazorpayPayment = async () => {
     if (!selectedNote) return;
     setPaymentStep("processing");
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const reconcileCompletedPurchase = async (noteId: string) => {
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const purchasesData = await paymentAPI.getPurchases();
+          const purchases = purchasesData.purchases || [];
+          const purchased = purchases.some((purchase: any) => {
+            const purchasedNoteId = purchase.noteId?._id || purchase.noteId;
+            return purchasedNoteId === noteId;
+          });
+
+          if (purchased) {
+            onPurchase(noteId);
+            return true;
+          }
+        } catch {
+          // ignore and retry briefly
+        }
+
+        if (attempt < 3) {
+          await sleep(1500);
+        }
+      }
+
+      return false;
+    };
+
     try {
       const keyResponse = await razorpayAPI.getKey();
       const razorpayKey = keyResponse.key;
@@ -191,7 +220,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
           try {
             await razorpayAPI.verifyNotePayment(
               selectedNote.id,
-              orderId,
+              response.razorpay_order_id,
               response.razorpay_payment_id,
               response.razorpay_signature
             );
@@ -205,7 +234,38 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
             setShowPaymentDialog(false);
             setSelectedNote(null);
           } catch (error) {
-            toast.error(formatClientErrorMessage('Payment verification failed. Please try again.'));
+            const message = formatClientErrorMessage(error, 'Payment verification failed. Please try again.');
+            const normalized = message.toLowerCase();
+
+            if (normalized.includes('already purchased') || normalized.includes('already verified') || normalized.includes('already completed') || normalized.includes('already been processed')) {
+              if (localPhone && localPhone !== userPhone) {
+                onSavePhone?.(localPhone).catch(() => {});
+              }
+              setPaymentStep("success");
+              await new Promise(resolve => setTimeout(resolve, 1200));
+              onPurchase(selectedNote.id);
+              toast.success("Payment was already processed. Notes are now available for download.");
+              setShowPaymentDialog(false);
+              setSelectedNote(null);
+              return;
+            }
+
+            // Reconcile with backend in case payment was captured and webhook completed
+            // while client-side verification returned an error/race.
+            const reconciled = await reconcileCompletedPurchase(selectedNote.id);
+            if (reconciled) {
+              if (localPhone && localPhone !== userPhone) {
+                onSavePhone?.(localPhone).catch(() => {});
+              }
+              setPaymentStep("success");
+              await sleep(1200);
+              toast.success("Payment captured successfully. Notes are now available for download.");
+              setShowPaymentDialog(false);
+              setSelectedNote(null);
+              return;
+            }
+
+            toast.error(message);
             setPaymentStep("confirm");
           }
         },

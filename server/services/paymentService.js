@@ -640,6 +640,7 @@ export const razorpayWebhookService = async ({
     if (!platformWallet) {
       platformWallet = await Wallet.create({
         userId: platformUserId,
+        tenantId: note.tenantId,
         balance: 0,
         transactions: []
       });

@@ -106,7 +106,7 @@ export function PremiumPaymentDialog({
           try {
             // Verify premium payment (signature check only, does NOT credit wallet)
             await razorpayAPI.verifyPremiumPayment(
-              orderId,
+              response.razorpay_order_id,
               response.razorpay_payment_id,
               response.razorpay_signature
             );
@@ -125,7 +125,7 @@ export function PremiumPaymentDialog({
               }, 500);
             }, 1500);
           } catch (error) {
-            toast.error(formatClientErrorMessage('Payment verification failed. Please contact support.'));
+            toast.error(formatClientErrorMessage(error, 'Payment verification failed. Please contact support.'));
             setIsProcessing(false);
           }
         },

@@ -638,7 +638,8 @@ export default function App() {
       const data = await paymentAPI.getPurchases();
       const purchases = data.purchases || [];
       const completedPurchases = purchases.filter((purchase: any) => purchase.status === 'completed');
-      setPurchasedNotes(completedPurchases.map((purchase: any) => purchase.noteId?._id || purchase.noteId));
+      const completedNoteIds = completedPurchases.map((purchase: any) => purchase.noteId?._id || purchase.noteId);
+      setPurchasedNotes(prev => Array.from(new Set([...prev, ...completedNoteIds])));
 
       const totalSpent = purchases.reduce((sum: number, purchase: any) => sum + Number(purchase.amount || 0), 0);
       setBuyerStats({ totalPurchases: purchases.length, totalSpent });
@@ -919,6 +920,7 @@ export default function App() {
   };
 
   const handlePurchase = async (noteId: string) => {
+    setPurchasedNotes(prev => (prev.includes(noteId) ? prev : [...prev, noteId]));
     await Promise.all([loadPurchases(), loadNotes(), loadWallet()]);
   };
 

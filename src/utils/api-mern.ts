@@ -1,7 +1,15 @@
 // NotesMitra MERN Stack API Client
 
-const _rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-const API_BASE_URL = _rawApiUrl.endsWith('/api') ? _rawApiUrl : `${_rawApiUrl}/api`;
+const normalizeApiBaseUrl = (rawUrl?: string) => {
+  const fallbackUrl = 'http://localhost:5000';
+  const unquoted = (rawUrl || fallbackUrl).trim().replace(/^['"]|['"]$/g, '');
+  const withoutTrailingSlash = unquoted.replace(/\/+$/g, '') || fallbackUrl;
+  const withoutApiSuffix = withoutTrailingSlash.replace(/\/api$/i, '');
+
+  return `${withoutApiSuffix}/api`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 
 // In cross-origin deployments (e.g. Vercel + Render), the CSRF cookie set by the
 // server on onrender.com is NOT readable via document.cookie from vercel.app due to
@@ -165,10 +173,22 @@ export const authAPI = {
   },
 
   googleFirebaseSignIn: async (idToken: string) => {
-    return apiCall('/auth/google/firebase', {
-      method: 'POST',
-      body: JSON.stringify({ idToken }),
-    });
+    try {
+      return await apiCall('/auth/google/firebase', {
+        method: 'POST',
+        body: JSON.stringify({ idToken }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (!message.includes('not found')) {
+        throw error;
+      }
+
+      return apiCall('/auth/google', {
+        method: 'POST',
+        body: JSON.stringify({ idToken }),
+      });
+    }
   },
   
   signOut: async () => {

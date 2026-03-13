@@ -29,9 +29,12 @@ const extractText = async (pdfBuffer) => {
 // ─── Model fallback chain ────────────────────────────────────────────────────
 // Tries models in order; skips any that return 503 (overloaded) or 429 (quota).
 const MODEL_CHAIN = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
   'gemini-flash-latest',
   'gemini-flash-lite-latest',
   'gemini-2.5-flash-lite',
+  'gemini-1.5-flash-latest',
 ];
 
 const generateWithFallback = async (apiKey, promptOrContents) => {
@@ -52,10 +55,152 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
   throw lastErr;
 };
 
+const toCleanLines = (text) => {
+  if (!text) return [];
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*•\d.)\s]+/, '').trim())
+    .filter((line) => line.length >= 12);
+};
+
+const toSentences = (text) => {
+  if (!text) return [];
+  return text
+    .replace(/\s+/g, ' ')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 25);
+};
+
+const uniqueKeepOrder = (items) => {
+  const seen = new Set();
+  const out = [];
+  for (const item of items) {
+    const key = item.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(item);
+    }
+  }
+  return out;
+};
+
+const buildFallbackSummary = (noteText, meta = {}) => {
+  const lines = toCleanLines(noteText);
+  const sentences = toSentences(noteText);
+
+  const summarySentences = sentences.slice(0, 5);
+  const title = meta.title || 'this note';
+  const subject = meta.subject || 'this subject';
+
+  const summary = summarySentences.length
+    ? summarySentences.join(' ')
+    : `A concise summary could not be generated from ${title}. This note appears to cover important points for ${subject}. Please review the key topics and quick revision points below.`;
+
+  const keyTopics = uniqueKeepOrder(
+    lines
+      .filter((line) => line.length <= 90)
+      .slice(0, 10)
+  );
+
+  const quickRevision = uniqueKeepOrder(
+    [...sentences.slice(0, 8), ...lines.slice(0, 8)]
+      .map((item) => item.length > 170 ? `${item.slice(0, 167)}...` : item)
+      .filter((item) => item.length >= 20)
+  ).slice(0, 12);
+
+  return {
+    summary,
+    keyTopics,
+    quickRevision,
+  };
+};
+
+const extractJsonCandidate = (raw) => {
+  if (!raw || typeof raw !== 'string') return null;
+  const firstBrace = raw.indexOf('{');
+  const lastBrace = raw.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
+  return raw.slice(firstBrace, lastBrace + 1);
+};
+
+const toStringArray = (value, maxItems = 15) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean)
+    .slice(0, maxItems);
+};
+
+const parseSummaryFromModelOutput = (raw, noteText, meta) => {
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const candidates = [
+    cleaned,
+    extractJsonCandidate(cleaned),
+    extractJsonCandidate(raw),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (!parsed || typeof parsed !== 'object') continue;
+
+      const fallback = buildFallbackSummary(noteText, meta);
+      const summary = typeof parsed.summary === 'string' && parsed.summary.trim()
+        ? parsed.summary.trim()
+        : fallback.summary;
+
+      const keyTopics = toStringArray(parsed.keyTopics, 10);
+      const quickRevision = toStringArray(parsed.quickRevision, 15);
+
+      return {
+        summary,
+        keyTopics: keyTopics.length ? keyTopics : fallback.keyTopics,
+        quickRevision: quickRevision.length ? quickRevision : fallback.quickRevision,
+      };
+    } catch {
+      // try next candidate
+    }
+  }
+
+  return buildFallbackSummary(noteText, meta);
+};
+
+const buildFallbackChatAnswer = (noteText, question, meta = {}) => {
+  const lines = toCleanLines(noteText);
+  const linePool = lines.length ? lines : toSentences(noteText);
+
+  const stopWords = new Set(['what', 'which', 'when', 'where', 'this', 'that', 'with', 'from', 'have', 'about', 'explain', 'tell', 'give', 'must', 'need', 'show']);
+  const keywords = (question.toLowerCase().match(/[a-z]{3,}/g) || []).filter((k) => !stopWords.has(k));
+
+  const matches = linePool.filter((line) =>
+    keywords.some((keyword) => line.toLowerCase().includes(keyword))
+  );
+
+  const chosen = (matches.length ? matches : linePool).slice(0, 4);
+  const bulletPoints = chosen.length
+    ? chosen.map((item) => `- ${item}`).join('\n')
+    : '- I could not extract enough text from this note to provide a targeted answer.';
+
+  return [
+    `Gemini is temporarily unavailable, so here is a quick answer from the note text (${meta.title || 'this note'}):`,
+    '',
+    bulletPoints,
+    '',
+    'Try again in a few moments for a full AI-generated explanation.'
+  ].join('\n');
+};
+
 // ─── 1. Summary ──────────────────────────────────────────────────────────────
 
 export const summariseNote = async (pdfBuffer, meta) => {
-  const noteText = await extractText(pdfBuffer);
+  let noteText = '';
+  try {
+    noteText = await extractText(pdfBuffer);
+  } catch (err) {
+    logger.warn('aiNotesAssistant: text extraction failed, using fallback summary', { error: err.message?.slice?.(0, 180) || String(err) });
+    return buildFallbackSummary('', meta);
+  }
 
   if (!noteText || noteText.length < 50) {
     return {
@@ -66,7 +211,10 @@ export const summariseNote = async (pdfBuffer, meta) => {
   }
 
   const apiKey = config.geminiApiKey;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
+  if (!apiKey) {
+    logger.warn('aiNotesAssistant: GEMINI_API_KEY is missing, using fallback summary');
+    return buildFallbackSummary(noteText, meta);
+  }
 
   const prompt = `You are an expert academic tutor helping students prepare for exams.
 Analyse the following study notes and create a comprehensive exam-ready summary.
@@ -97,16 +245,10 @@ Rules:
 
   try {
     const raw = await generateWithFallback(apiKey, prompt);
-    const cleaned = raw.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-    const parsed = JSON.parse(cleaned);
-    return {
-      summary: parsed.summary || '',
-      keyTopics: Array.isArray(parsed.keyTopics) ? parsed.keyTopics : [],
-      quickRevision: Array.isArray(parsed.quickRevision) ? parsed.quickRevision : [],
-    };
+    return parseSummaryFromModelOutput(raw, noteText, meta);
   } catch (err) {
-    logger.error('aiNotesAssistant: summariseNote failed', { error: err.message });
-    throw new Error('AI summary generation failed. Please try again.');
+    logger.warn('aiNotesAssistant: summariseNote failed, using fallback summary', { error: err.message.slice(0, 180) });
+    return buildFallbackSummary(noteText, meta);
   }
 };
 
@@ -117,10 +259,19 @@ export const chatAboutNote = async (pdfBuffer, meta, question, history = []) => 
     throw new Error('Please enter a valid question.');
   }
 
-  const noteText = await extractText(pdfBuffer);
+  let noteText = '';
+  try {
+    noteText = await extractText(pdfBuffer);
+  } catch (err) {
+    logger.warn('aiNotesAssistant: text extraction failed, using fallback chat response', { error: err.message?.slice?.(0, 180) || String(err) });
+    return buildFallbackChatAnswer('', question, meta);
+  }
 
   const apiKey = config.geminiApiKey;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not configured');
+  if (!apiKey) {
+    logger.warn('aiNotesAssistant: GEMINI_API_KEY is missing, using fallback chat response');
+    return buildFallbackChatAnswer(noteText, question, meta);
+  }
 
   const systemContext = `You are an expert academic tutor. A student is asking questions about the following study material.
 
@@ -156,10 +307,10 @@ Rules:
 
   try {
     const answer = await generateWithFallback(apiKey, { contents });
-    return answer;
+    return answer || buildFallbackChatAnswer(noteText, question, meta);
   } catch (err) {
-    logger.error('aiNotesAssistant: chatAboutNote failed', { error: err.message });
-    throw new Error('AI chat failed. Please try again.');
+    logger.warn('aiNotesAssistant: chatAboutNote failed, using fallback chat response', { error: err.message.slice(0, 180) });
+    return buildFallbackChatAnswer(noteText, question, meta);
   }
 };
 

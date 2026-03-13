@@ -31,7 +31,15 @@ import {
 
 const require = createRequire(import.meta.url);
 const pdfParseLib = require('pdf-parse');
-const parsePDF = async (buf) => pdfParseLib(buf);
+const resolvePdfParser = () => {
+  if (typeof pdfParseLib === 'function') return pdfParseLib;
+  if (typeof pdfParseLib?.default === 'function') return pdfParseLib.default;
+  throw new Error('pdf-parse parser function is unavailable');
+};
+const parsePDF = async (buf) => {
+  const parser = resolvePdfParser();
+  return parser(buf);
+};
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -67,7 +75,14 @@ const analyseWithGemini = async (extractedText, pageCount, totalChars) => {
 
   const genAI = new GoogleGenerativeAI(apiKey);
   // Model fallback chain — skip overloaded/rate-limited models automatically
-  const MODEL_CHAIN = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash-lite'];
+  const MODEL_CHAIN = [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-flash-latest',
+    'gemini-flash-lite-latest',
+    'gemini-2.5-flash-lite',
+    'gemini-1.5-flash-latest',
+  ];
 
   const avgCharsPerPage = pageCount > 0 ? Math.round(totalChars / pageCount) : 0;
 
@@ -168,7 +183,12 @@ Respond with the JSON object only.`;
       raw = result.response.text().trim();
       break; // success
     } catch (err) {
-      const isRetryable = err.message.includes('503') || err.message.includes('429') || err.message.includes('overloaded');
+      const message = err?.message || '';
+      const isRetryable =
+        message.includes('503') ||
+        message.includes('429') ||
+        message.toLowerCase().includes('overloaded') ||
+        (message.includes('404') && message.toLowerCase().includes('model'));
       logger.warn(`geminiQualityChecker: model ${modelName} failed (${isRetryable ? 'retryable' : 'fatal'})`, { error: err.message.slice(0, 120) });
       lastErr = err;
       if (!isRetryable) break;
@@ -183,7 +203,18 @@ Respond with the JSON object only.`;
   try {
     parsed = JSON.parse(cleaned);
   } catch {
-    throw new Error(`Gemini returned non-JSON response: ${raw.slice(0, 200)}`);
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = cleaned.slice(firstBrace, lastBrace + 1);
+      try {
+        parsed = JSON.parse(candidate);
+      } catch {
+        throw new Error(`Gemini returned non-JSON response: ${raw.slice(0, 200)}`);
+      }
+    } else {
+      throw new Error(`Gemini returned non-JSON response: ${raw.slice(0, 200)}`);
+    }
   }
 
   // Validate shape — all 5 checks must be present
@@ -194,6 +225,58 @@ Respond with the JSON object only.`;
   }
 
   return parsed;
+};
+
+const safeRuleCheck = async (label, checker, fallbackValue) => {
+  try {
+    const result = await checker();
+    if (!result || typeof result !== 'object') {
+      return { ...fallbackValue, warning: `${label} check returned invalid output` };
+    }
+    return result;
+  } catch (error) {
+    logger.error(`geminiQualityChecker: ${label} fallback failed`, { error: error.message });
+    return { ...fallbackValue, error: error.message };
+  }
+};
+
+const runRuleBasedFallback = async (pdfBuffer, reason = 'unknown') => {
+  logger.warn('geminiQualityChecker: using rule-based fallback', { reason });
+
+  const [bp, q, c, wm, md] = await Promise.all([
+    safeRuleCheck('blank page', () => ruleBasedBlankPages(pdfBuffer), {
+      passed: true,
+      pageCount: 0,
+      warning: 'Blank-page check unavailable',
+    }),
+    safeRuleCheck('quality', () => ruleBasedQuality(pdfBuffer), {
+      passed: true,
+      qualityScore: 0,
+      warning: 'Scan-quality check unavailable',
+    }),
+    safeRuleCheck('copyright', () => ruleBasedCopyright(pdfBuffer), {
+      passed: true,
+      suspicionLevel: 'unknown',
+      warning: 'Copyright check unavailable',
+    }),
+    safeRuleCheck('watermark', () => ruleBasedWatermark(pdfBuffer), {
+      passed: true,
+      message: null,
+    }),
+    safeRuleCheck('metadata', () => ruleBasedMetadata(pdfBuffer), {
+      passed: true,
+      warning: 'Metadata check unavailable',
+    }),
+  ]);
+
+  return {
+    blankPages: bp,
+    quality: q,
+    copyright: c,
+    watermark: wm,
+    metadata: md,
+    usedAI: false,
+  };
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -212,13 +295,7 @@ export const runGeminiChecks = async (pdfBuffer) => {
     extracted = await extractText(pdfBuffer);
   } catch (err) {
     logger.error('geminiQualityChecker: text extraction failed', { error: err.message });
-    // Fall back for all three checks
-    const [bp, q, c] = await Promise.all([
-      ruleBasedBlankPages(pdfBuffer),
-      ruleBasedQuality(pdfBuffer),
-      ruleBasedCopyright(pdfBuffer),
-    ]);
-    return { blankPages: bp, quality: q, copyright: c, usedAI: false };
+    return runRuleBasedFallback(pdfBuffer, `text extraction failed: ${err.message}`);
   }
 
   // ── Gemini analysis ──────────────────────────────────────────────────────
@@ -269,19 +346,7 @@ export const runGeminiChecks = async (pdfBuffer) => {
       usedAI: true,
     };
   } catch (err) {
-    logger.warn('geminiQualityChecker: Gemini analysis failed, falling back to rule-based', {
-      error: err.message,
-    });
-
-    // Graceful fallback — run all rule-based checks in parallel
-    const [bp, q, c, wm, md] = await Promise.all([
-      ruleBasedBlankPages(pdfBuffer),
-      ruleBasedQuality(pdfBuffer),
-      ruleBasedCopyright(pdfBuffer),
-      ruleBasedWatermark(pdfBuffer),
-      ruleBasedMetadata(pdfBuffer),
-    ]);
-    return { blankPages: bp, quality: q, copyright: c, watermark: wm, metadata: md, usedAI: false };
+    return runRuleBasedFallback(pdfBuffer, `Gemini analysis failed: ${err.message}`);
   }
 };
 
