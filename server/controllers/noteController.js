@@ -1195,7 +1195,11 @@ export const getAISummary = async (req, res, next) => {
 
     logger.debug('getAISummary: calling summariseNote',  { bufferSize: pdfBuffer.length, noteTitle: note.title });
     
-    const result = await summariseNote(pdfBuffer, { title: note.title, subject: note.subject });
+    const result = await summariseNote(pdfBuffer, {
+      title: note.title,
+      subject: note.subject,
+      description: note.description
+    });
     
     logger.info('getAISummary: summary generated', {
       noteId: note._id,
@@ -1245,7 +1249,11 @@ export const aiChatAboutNote = async (req, res, next) => {
 
     const answer = await chatAboutNote(
       pdfBuffer,
-      { title: note.title, subject: note.subject },
+      {
+        title: note.title,
+        subject: note.subject,
+        description: note.description
+      },
       question.trim(),
       Array.isArray(history) ? history : []
     );

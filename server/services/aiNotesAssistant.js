@@ -5,7 +5,7 @@
  *   1. summariseNote  – Generate a structured exam-ready summary of a note's content
  *   2. chatAboutNote  – Answer a student's question using the note content as context
  *
- * Uses Gemini with a model fallback chain so that if one model is overloaded or
+ * Uses Groq with a model fallback chain so that if one model is overloaded or
  * rate-limited, it automatically retries with the next available model.
  */
 
@@ -124,20 +124,22 @@ export const extractText = async (pdfBuffer) => {
 // ─── Summary Caching (Redis) ─────────────────────────────────────────────────
 // Cache summaries for 7 days to reduce API calls by 80-90%
 // Multiple students reading same note = 1 API call instead of 20+
-const getCacheKey = (noteText, title, subject) => {
+const SUMMARY_CACHE_VERSION = 'v3';
+
+const getCacheKey = (contextText, meta = {}, contextSource = 'pdf-text') => {
   const hash = crypto.createHash('sha256')
-    .update(`${noteText}|${title}|${subject}`)
+    .update(`${SUMMARY_CACHE_VERSION}|${contextSource}|${contextText || ''}|${meta?.title || ''}|${meta?.subject || ''}|${meta?.description || ''}`)
     .digest('hex');
   return `summary:${hash}`;
 };
 
-const getCachedSummary = async (noteText, title, subject) => {
+const getCachedSummary = async (contextText, meta = {}, contextSource = 'pdf-text') => {
   try {
     const { getRedisPublisher } = await import('../config/redis.js');
     const redisClient = getRedisPublisher();
     if (!redisClient) return null;
     
-    const cacheKey = getCacheKey(noteText, title, subject);
+    const cacheKey = getCacheKey(contextText, meta, contextSource);
     const cached = await redisClient.get(cacheKey);
     
     if (cached) {
@@ -151,13 +153,13 @@ const getCachedSummary = async (noteText, title, subject) => {
   }
 };
 
-const setCachedSummary = async (noteText, title, subject, summary) => {
+const setCachedSummary = async (contextText, meta = {}, contextSource = 'pdf-text', summary) => {
   try {
     const { getRedisPublisher } = await import('../config/redis.js');
     const redisClient = getRedisPublisher();
     if (!redisClient) return;
     
-    const cacheKey = getCacheKey(noteText, title, subject);
+    const cacheKey = getCacheKey(contextText, meta, contextSource);
     const CACHE_DURATION = 7 * 24 * 60 * 60; // 7 days in seconds
     await redisClient.setex(cacheKey, CACHE_DURATION, JSON.stringify(summary));
     logger.info('aiNotesAssistant: summary cached for 7 days', { cacheKey: cacheKey.slice(0, 20) });
@@ -171,11 +173,64 @@ const setCachedSummary = async (noteText, title, subject, summary) => {
 // Last verified: llama-3.1-8b-instant is stable and reliable
 // Mixtral & llama-3.1-70b have been decommissioned by Groq
 const MODEL_CHAIN = [
-  'llama-3.1-8b-instant',     // Confirmed working & reliable
-  'mixtral-8x7b-32768',       // Fallback (may be decommissioned, but worth trying)
+  'llama-3.1-8b-instant',
+  'mixtral-8x7b-32768',
 ];
 
-const generateWithFallback = async (apiKey, promptOrContents) => {
+const toGroqMessages = (requestPayload) => {
+  if (typeof requestPayload === 'string') {
+    return [
+      {
+        role: 'system',
+        content: 'You are a JSON response generator. IMPORTANT: Respond with ONLY valid JSON object. NO markdown. NO code fences. NO explanations. NO text before or after. Return raw valid JSON only.'
+      },
+      {
+        role: 'user',
+        content: requestPayload
+      }
+    ];
+  }
+
+  if (requestPayload?.mode === 'chat' && Array.isArray(requestPayload.messages)) {
+    return requestPayload.messages
+      .map((msg) => ({
+        role: msg?.role === 'assistant' ? 'assistant' : msg?.role === 'system' ? 'system' : 'user',
+        content: typeof msg?.content === 'string' ? msg.content.trim() : ''
+      }))
+      .filter((msg) => !!msg.content);
+  }
+
+  if (Array.isArray(requestPayload?.contents)) {
+    return requestPayload.contents
+      .map((turn) => {
+        const content = Array.isArray(turn?.parts)
+          ? turn.parts.map((part) => part?.text).filter(Boolean).join('\n').trim()
+          : '';
+        return {
+          role: turn?.role === 'model' ? 'assistant' : turn?.role === 'system' ? 'system' : 'user',
+          content
+        };
+      })
+      .filter((msg) => !!msg.content);
+  }
+
+  const fallbackPrompt = typeof requestPayload?.prompt === 'string'
+    ? requestPayload.prompt
+    : 'summarize this';
+
+  return [
+    {
+      role: 'system',
+      content: 'You are a JSON response generator. IMPORTANT: Respond with ONLY valid JSON object. NO markdown. NO code fences. NO explanations. NO text before or after. Return raw valid JSON only.'
+    },
+    {
+      role: 'user',
+      content: fallbackPrompt
+    }
+  ];
+};
+
+const generateWithFallback = async (apiKey, requestPayload) => {
   // Lazy load Groq SDK to avoid crashes if not available
   let Groq;
   try {
@@ -188,26 +243,27 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
 
   const groq = new Groq({ apiKey });
   let lastErr;
+  const mode = requestPayload?.mode === 'chat' ? 'chat' : 'summary';
+  const messages = toGroqMessages(requestPayload);
+  const temperature = mode === 'chat' ? 0.4 : 0.3;
+  const maxTokens = mode === 'chat' ? 1200 : 2000;
+
+  if (!messages.length) {
+    throw new Error('No valid messages provided for Groq request');
+  }
   
   for (const modelName of MODEL_CHAIN) {
     try {
-      logger.debug(`aiNotesAssistant: trying model ${modelName}`);
+      logger.debug(`aiNotesAssistant: trying model ${modelName}`, {
+        mode,
+        messageCount: messages.length
+      });
+
       const result = await groq.chat.completions.create({
         model: modelName,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a JSON response generator. IMPORTANT: Respond with ONLY valid JSON object. NO markdown. NO code fences. NO explanations. NO text before or after. Return raw valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: typeof promptOrContents === 'string' 
-              ? promptOrContents 
-              : (promptOrContents[0]?.text || 'summarize this')
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 2000,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
         top_p: 1
       });
       
@@ -271,7 +327,7 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
     }
   }
   
-  throw lastErr || new Error('All Gemini models failed or API key is invalid');
+  throw lastErr || new Error('All Groq models failed or API key is invalid');
 };
 
 const toCleanLines = (text) => {
@@ -315,6 +371,61 @@ const uniqueKeepOrder = (items) => {
     }
   }
   return out;
+};
+
+const sanitizeMetaText = (value) => {
+  if (typeof value !== 'string') return '';
+  const cleaned = value.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+
+  // Keep short, human-like labels but remove obvious OCR/gibberish titles
+  const letterCount = (cleaned.match(/[a-z]/gi) || []).length;
+  const vowels = (cleaned.match(/[aeiou]/gi) || []).length;
+  const vowelRatio = letterCount > 0 ? vowels / letterCount : 0;
+  const hasLongConsonantRun = /[bcdfghjklmnpqrstvwxyz]{6,}/i.test(cleaned);
+  const hasHugeToken = cleaned.split(/\s+/).some((token) => token.length > 35);
+
+  if ((letterCount > 20 && vowelRatio < 0.2) || hasLongConsonantRun || hasHugeToken || isCorruptedText(cleaned)) {
+    return '';
+  }
+
+  return cleaned;
+};
+
+const buildStudyContext = (noteText, meta = {}) => {
+  const safeMeta = {
+    title: sanitizeMetaText(meta.title),
+    subject: sanitizeMetaText(meta.subject),
+    description: sanitizeMetaText(meta.description)
+  };
+
+  const metadataText = [
+    safeMeta.title ? `Title: ${safeMeta.title}` : '',
+    safeMeta.subject ? `Subject: ${safeMeta.subject}` : '',
+    safeMeta.description ? `Description: ${safeMeta.description}` : ''
+  ].filter(Boolean).join('\n');
+
+  if (noteText && noteText.trim().length > 0) {
+    return {
+      text: noteText.trim(),
+      source: 'pdf-text',
+      safeMeta
+    };
+  }
+
+  if (metadataText) {
+    return {
+      text: metadataText,
+      source: 'metadata',
+      safeMeta
+    };
+  }
+
+  return {
+    text: '',
+    source: 'none',
+    safeMeta
+  };
 };
 
 const buildFallbackSummary = (noteText, meta = {}) => {
@@ -542,10 +653,20 @@ const parseSummaryFromModelOutput = (raw, noteText, meta) => {
       const keyTopics = toStringArray(keyTopicsArray, 10);
       const quickRevision = toStringArray(quickRevisionArray, 15);
 
+      const mergedKeyTopics = uniqueKeepOrder([
+        ...keyTopics,
+        ...fallback.keyTopics
+      ]).slice(0, 10);
+
+      const mergedQuickRevision = uniqueKeepOrder([
+        ...quickRevision,
+        ...fallback.quickRevision
+      ]).slice(0, 12);
+
       const result = {
         summary,
-        keyTopics: keyTopics.length ? keyTopics : fallback.keyTopics,
-        quickRevision: quickRevision.length ? quickRevision : fallback.quickRevision,
+        keyTopics: mergedKeyTopics,
+        quickRevision: mergedQuickRevision,
       };
 
       logger.info('parseSummaryFromModelOutput: successfully parsed and returned', {
@@ -574,9 +695,10 @@ const parseSummaryFromModelOutput = (raw, noteText, meta) => {
   return buildFallbackSummary(noteText, meta);
 };
 
-const buildFallbackChatAnswer = (noteText, question, meta = {}) => {
-  const lines = toCleanLines(noteText);
-  const linePool = lines.length ? lines : toSentences(noteText);
+const buildFallbackChatAnswer = (noteText, question, meta = {}, reason = 'model-fallback') => {
+  const context = buildStudyContext(noteText, meta);
+  const lines = toCleanLines(context.text);
+  const linePool = lines.length ? lines : toSentences(context.text);
 
   const stopWords = new Set(['what', 'which', 'when', 'where', 'this', 'that', 'with', 'from', 'have', 'about', 'explain', 'tell', 'give', 'must', 'need', 'show']);
   const keywords = (question.toLowerCase().match(/[a-z]{3,}/g) || []).filter((k) => !stopWords.has(k));
@@ -588,10 +710,33 @@ const buildFallbackChatAnswer = (noteText, question, meta = {}) => {
   const chosen = (matches.length ? matches : linePool).slice(0, 4);
   const bulletPoints = chosen.length
     ? chosen.map((item) => `- ${item}`).join('\n')
-    : '- I could not extract enough text from this note to provide a targeted answer.';
+    : '- I could not extract enough reliable text from this note to provide a targeted answer.';
+
+  if (context.source === 'none') {
+    return [
+      'I could not read usable text from this PDF, so I cannot answer your question reliably yet.',
+      '',
+      '- Please upload a digital PDF (with selectable text), or',
+      '- Upload an OCR-processed version if this is a scanned document.',
+      '',
+      'After re-uploading, Ask AI will answer your doubts from the note content.'
+    ].join('\n');
+  }
+
+  if (context.source === 'metadata') {
+    return [
+      'I could not extract readable PDF text, so this answer is based on note metadata only.',
+      '',
+      bulletPoints,
+      '',
+      'For accurate, content-based answers, upload a readable/OCR PDF and ask again.'
+    ].join('\n');
+  }
 
   return [
-    `Groq AI is temporarily unavailable, so here is a quick answer from the note text (${meta.title || 'this note'}):`,
+    reason === 'ai-unavailable'
+      ? 'Groq AI is temporarily unavailable, so here is a quick answer from extracted note text:'
+      : 'Here is a quick answer from extracted note text:',
     '',
     bulletPoints,
     '',
@@ -613,40 +758,52 @@ export const summariseNote = async (pdfBuffer, meta) => {
     logger.info('Step 1️⃣ Result: Extracted ' + noteText.length + ' characters');
   } catch (err) {
     logger.error('❌ Step 1 CRASHED: ' + err.message);
-    return buildFallbackSummary('', meta);
+    return buildFallbackSummary('', buildStudyContext('', meta).safeMeta);
   }
 
-  if (!noteText || noteText.length === 0) {
-    logger.error('❌ Step 1 RESULT: EMPTY TEXT (0 chars) - PDF may be corrupted, image-based, or empty');
-    return buildFallbackSummary('', meta);
+  const context = buildStudyContext(noteText, meta);
+
+  if (context.source === 'none') {
+    logger.error('❌ Step 1 RESULT: No usable PDF text or metadata available');
+    return buildFallbackSummary('', context.safeMeta);
   }
 
-  if (noteText.length < 50) {
-    logger.warn('⚠️  Very short text: ' + noteText.length + ' chars. Will still try Groq');
+  if (context.source === 'metadata') {
+    logger.warn('⚠️  No extractable PDF text. Using metadata context for summary generation.');
+  } else if (context.text.length < 50) {
+    logger.warn('⚠️  Very short text: ' + context.text.length + ' chars. Will still try Groq');
   } else {
-    logger.info('✅ Good text length: ' + noteText.length + ' chars');
+    logger.info('✅ Good text length: ' + context.text.length + ' chars');
   }
 
   const apiKey = config.groqApiKey;
   if (!apiKey) {
     logger.error('aiNotesAssistant: GROQ_API_KEY is missing or empty');
-    return buildFallbackSummary(noteText, meta);
+    return buildFallbackSummary(context.text, context.safeMeta);
   }
 
-  const prompt = `CONTENT: ${noteText}
+  const prompt = `CONTEXT SOURCE: ${context.source}
+
+STUDY CONTENT:
+${context.text}
 
 CREATE THIS EXACT JSON WITH NO OTHER TEXT:
 {
-  "summary": "Write 2-3 sentences summarizing the main content concepts.",
+  "summary": "Write a clear 4-6 sentence full study summary for exam revision.",
   "keyTopics": ["Topic 1", "Topic 2", "Topic 3", "Topic 4", "Topic 5", "Topic 6", "Topic 7", "Topic 8"],
   "quickRevision": ["Fact 1", "Fact 2", "Fact 3", "Fact 4", "Fact 5", "Fact 6", "Fact 7", "Fact 8", "Fact 9", "Fact 10"]
 }
+
+Rules:
+- Return AT LEAST 8 keyTopics and AT LEAST 10 quickRevision points.
+- If context source is metadata, be honest and avoid inventing very specific facts.
+- Do not output markdown.
 
 NEVER ADD MARKDOWN, CODE FENCES, OR ANY TEXT OUTSIDE THE JSON.`;
 
   try {
     // ✅ CHECK CACHE FIRST
-    const cachedResult = await getCachedSummary(noteText, meta.title, meta.subject);
+    const cachedResult = await getCachedSummary(context.text, context.safeMeta, context.source);
     if (cachedResult) {
       logger.info('aiNotesAssistant: returning cached summary (7-day cache hit)', {
         source: 'redis-cache',
@@ -662,17 +819,20 @@ NEVER ADD MARKDOWN, CODE FENCES, OR ANY TEXT OUTSIDE THE JSON.`;
       promptLength: prompt.length
     });
     
-    const raw = await generateWithFallback(apiKey, prompt);
+    const raw = await generateWithFallback(apiKey, {
+      mode: 'summary',
+      prompt
+    });
     
     logger.debug('aiNotesAssistant: Groq response received', { 
       responseLength: raw?.length,
       responseStart: raw?.substring?.(0, 150)
     });
     
-    const parsed = parseSummaryFromModelOutput(raw, noteText, meta);
+    const parsed = parseSummaryFromModelOutput(raw, context.text, context.safeMeta);
     
     // ✅ STORE IN CACHE FOR 7 DAYS
-    await setCachedSummary(noteText, meta.title, meta.subject, parsed);
+    await setCachedSummary(context.text, context.safeMeta, context.source, parsed);
     
     logger.info('aiNotesAssistant: summariseNote generated successfully', {
       source: 'ai-generated',
@@ -684,10 +844,11 @@ NEVER ADD MARKDOWN, CODE FENCES, OR ANY TEXT OUTSIDE THE JSON.`;
   } catch (err) {
     logger.error('aiNotesAssistant: summariseNote failed, using fallback', { 
       error: err.message?.slice?.(0, 200) || String(err),
-      hasNoteText: !!noteText,
-      noteTextLength: noteText?.length || 0
+      hasNoteText: !!context.text,
+      noteTextLength: context.text?.length || 0,
+      contextSource: context.source
     });
-    const fallback = buildFallbackSummary(noteText, meta);
+    const fallback = buildFallbackSummary(context.text, context.safeMeta);
     logger.info('aiNotesAssistant: returning fallback summary', {
       source: 'fallback',
       quickRevisionCount: fallback.quickRevision?.length || 0,
@@ -709,62 +870,76 @@ export const chatAboutNote = async (pdfBuffer, meta, question, history = []) => 
     noteText = await extractText(pdfBuffer);
   } catch (err) {
     logger.error('aiNotesAssistant: text extraction failed for chat', { error: err.message?.slice?.(0, 180) || String(err) });
-    return buildFallbackChatAnswer('', question, meta);
+    return buildFallbackChatAnswer('', question, meta, 'no-context');
   }
+
+  const context = buildStudyContext(noteText, meta);
 
   const apiKey = config.groqApiKey;
   if (!apiKey) {
     logger.error('aiNotesAssistant: GROQ_API_KEY is missing or empty for chat');
-    return buildFallbackChatAnswer(noteText, question, meta);
+    return buildFallbackChatAnswer(context.text, question, context.safeMeta, 'ai-unavailable');
+  }
+
+  if (!context.text) {
+    logger.warn('aiNotesAssistant: no usable context for chat');
+    return buildFallbackChatAnswer('', question, context.safeMeta, 'no-context');
   }
 
   const systemContext = `You are an expert academic tutor. A student is asking questions about the following study material.
 
-Note Title: ${meta.title || 'Study Notes'}
-Subject: ${meta.subject || 'General'}
+Note Title: ${context.safeMeta.title || 'Study Notes'}
+Subject: ${context.safeMeta.subject || 'General'}
+Context Source: ${context.source}
 
 --- STUDY MATERIAL ---
-${noteText || '(No extractable text in this note)'}
+${context.text}
 --- END OF STUDY MATERIAL ---
 
 Rules:
 - Answer ONLY based on the study material above and general academic knowledge.
 - Keep answers clear, concise and exam-focused.
 - If the answer is not in the material, say so honestly but still provide a helpful general answer.
+- If context source is metadata, clearly mention that the answer is metadata-based.
 - Use bullet points, numbered lists, or simple explanations where helpful.
 - Do NOT invent or fabricate facts.`;
 
-  // Build the full conversation as a single generateContent call (avoids startChat 503 issues)
-  const contents = [
-    { role: 'user', parts: [{ text: systemContext + '\n\nPlease confirm you understand and are ready to help.' }] },
-    { role: 'model', parts: [{ text: 'Understood! I have read the study material and I am ready to help you with exam preparation. Ask me anything about it.' }] },
+  const messages = [
+    { role: 'system', content: systemContext }
   ];
 
   // Append prior conversation turns (max last 8 to keep token count manageable)
   for (const turn of history.slice(-8)) {
-    contents.push({
-      role: turn.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: turn.content }],
+    if (!turn || typeof turn.content !== 'string' || !turn.content.trim()) continue;
+    messages.push({
+      role: (turn.role === 'assistant' || turn.role === 'model') ? 'assistant' : 'user',
+      content: turn.content.trim(),
     });
   }
 
-  contents.push({ role: 'user', parts: [{ text: question.trim() }] });
+  messages.push({ role: 'user', content: question.trim() });
 
   try {
-    const answer = await generateWithFallback(apiKey, { contents });
+    const answer = await generateWithFallback(apiKey, {
+      mode: 'chat',
+      messages
+    });
+
     if (!answer || !answer.trim()) {
       logger.warn('aiNotesAssistant: empty response from chat, using fallback');
-      return buildFallbackChatAnswer(noteText, question, meta);
+      return buildFallbackChatAnswer(context.text, question, context.safeMeta, 'ai-unavailable');
     }
+
     logger.info('aiNotesAssistant: chatAboutNote answered successfully');
     return answer;
   } catch (err) {
     logger.error('aiNotesAssistant: chatAboutNote failed, using fallback', { 
       error: err.message?.slice?.(0, 200) || String(err),
-      hasNoteText: !!noteText,
+      hasNoteText: !!context.text,
+      contextSource: context.source,
       questionLength: question?.length || 0
     });
-    return buildFallbackChatAnswer(noteText, question, meta);
+    return buildFallbackChatAnswer(context.text, question, context.safeMeta, 'ai-unavailable');
   }
 };
 
