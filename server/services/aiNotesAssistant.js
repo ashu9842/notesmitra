@@ -22,7 +22,7 @@ const MAX_CHARS = 15_000;
 
 export const extractText = async (pdfBuffer) => {
   if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) {
-    logger.error('extractText: invalid buffer', { 
+    logger.error('❌ extractText: INVALID BUFFER', { 
       hasBuffer: !!pdfBuffer, 
       isBuffer: pdfBuffer ? Buffer.isBuffer(pdfBuffer) : false,
       type: typeof pdfBuffer
@@ -31,21 +31,22 @@ export const extractText = async (pdfBuffer) => {
   }
 
   try {
-    logger.debug('extractText: starting PDF parse', { bufferSize: pdfBuffer.length });
+    logger.info('📄 extractText: STARTING PDF PARSE', { bufferSize: pdfBuffer.length });
     const data = await pdfParseLib(pdfBuffer);
     const text = (data.text || '').slice(0, MAX_CHARS).trim();
     
-    logger.info('extractText: PDF parsed successfully', {
-      totalChars: text.length,
+    logger.info('✅ extractText: PDF PARSED', {
+      finalTextLength: text.length,
+      rawTextLength: (data.text || '').length,
       pageCount: data.numpages || 'unknown',
-      bufferSize: pdfBuffer.length,
-      rawTextLength: (data.text || '').length
+      isEmpty: text.length === 0,
+      preview: text.substring(0, 80)
     });
     
     return text;
   } catch (err) {
-    logger.error('extractText: PDF parsing failed', { 
-      error: err.message,
+    logger.error('❌ extractText: PARSING FAILED', { 
+      error: err.message?.substring(0, 200),
       bufferSize: pdfBuffer?.length,
       errorType: err.constructor.name
     });
@@ -513,44 +514,29 @@ const buildFallbackChatAnswer = (noteText, question, meta = {}) => {
 // ─── 1. Summary ──────────────────────────────────────────────────────────────
 
 export const summariseNote = async (pdfBuffer, meta) => {
+  logger.info('═══════════════════════════════════════════');
+  logger.info('📋 summariseNote START - Note: ' + (meta?.title || 'Unknown'));
+  logger.info('═══════════════════════════════════════════');
+
   let noteText = '';
   try {
-    logger.debug('summariseNote: starting', { 
-      bufferSize: pdfBuffer?.length,
-      meta: { title: meta?.title, subject: meta?.subject }
-    });
-    
+    logger.info('Step 1️⃣: Extracting text from PDF buffer (size: ' + pdfBuffer?.length + ' bytes)');
     noteText = await extractText(pdfBuffer);
-    
-    logger.debug('summariseNote: text extracted', { 
-      extractedLength: noteText.length,
-      title: meta.title
-    });
+    logger.info('Step 1️⃣ Result: Extracted ' + noteText.length + ' characters');
   } catch (err) {
-    logger.error('aiNotesAssistant: text extraction failed', { 
-      error: err.message?.slice?.(0, 180) || String(err),
-      bufferSize: pdfBuffer?.length
-    });
+    logger.error('❌ Step 1 CRASHED: ' + err.message);
     return buildFallbackSummary('', meta);
   }
 
-  // If extracted text is too short, warn but still try Groq (some notes are short)
-  if (!noteText) {
-    logger.error('aiNotesAssistant: NO TEXT EXTRACTED from PDF', { 
-      noteTitle: meta.title,
-      bufferSize: pdfBuffer?.length
-    });
+  if (!noteText || noteText.length === 0) {
+    logger.error('❌ Step 1 RESULT: EMPTY TEXT (0 chars) - PDF may be corrupted, image-based, or empty');
     return buildFallbackSummary('', meta);
   }
 
   if (noteText.length < 50) {
-    logger.warn('aiNotesAssistant: very short text content extracted', { 
-      textLength: noteText?.length || 0,
-      noteTitle: meta.title,
-      minDesired: 50,
-      text: noteText.substring(0, 100)
-    });
-    // Don't bail out - try Groq anyway with what we have
+    logger.warn('⚠️  Very short text: ' + noteText.length + ' chars. Will still try Groq');
+  } else {
+    logger.info('✅ Good text length: ' + noteText.length + ' chars');
   }
 
   const apiKey = config.groqApiKey;

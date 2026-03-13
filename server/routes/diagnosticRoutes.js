@@ -561,4 +561,166 @@ router.post('/test-pdf-extraction/:noteId', async (req, res) => {
   }
 });
 
+/**
+ * Full debug trace of summariseNote process
+ * POST /diagnostic/trace-summary/:noteId
+ * Shows: fetch → extract → groq → parse with EVERY detail
+ */
+router.post('/diagnostic/trace-summary/:noteId', async (req, res) => {
+  const trace = [];
+  const log = (step, status, details) => {
+    trace.push({ step, status, details, timestamp: new Date().toISOString() });
+    console.log(`[${step}] ${status}:`, details);
+  };
+
+  try {
+    const { Note } = await import('../models/index.js');
+
+    log('DB', 'FETCH', 'Loading note from database (diagnostic mode - no auth check)');
+    const note = await Note.findById(req.params.noteId).lean();
+    if (!note) return res.status(404).json({ error: 'Note not found', trace });
+    log('DB', 'OK', { title: note.title, storageType: note.storageType, hasCloudinary: !!note.cloudinaryPublicId, hasPath: !!note.filePath });
+
+    // STEP 1: Fetch PDF
+    log('PDF Fetch', 'START', { storageType: note.storageType });
+    const fs = (await import('fs')).default;
+    const { downloadCloudinaryFile } = await import('../config/cloudinary.js');
+    const { extractText } = await import('../services/aiNotesAssistant.js');
+    
+    let pdfBuffer = null;
+    if (note.storageType === 'cloudinary' && note.cloudinaryPublicId) {
+      try {
+        const resp = await downloadCloudinaryFile(note.cloudinaryPublicId);
+        if (!resp?.ok) {
+          log('PDF Fetch', 'FAILED', { status: resp?.status, reason: 'HTTP not OK' });
+          return res.status(400).json({ error: 'Cloudinary download failed', trace });
+        }
+        pdfBuffer = Buffer.from(await resp.arrayBuffer());
+        log('PDF Fetch', 'OK', { source: 'Cloudinary', bufferSize: pdfBuffer.length });
+      } catch (e) {
+        log('PDF Fetch', 'ERROR', e.message);
+        return res.status(500).json({ error: e.message, trace });
+      }
+    } else if (note.filePath && fs.existsSync(note.filePath)) {
+      try {
+        pdfBuffer = fs.readFileSync(note.filePath);
+        log('PDF Fetch', 'OK', { source: 'LocalFile', bufferSize: pdfBuffer.length });
+      } catch (e) {
+        log('PDF Fetch', 'ERROR', e.message);
+        return res.status(500).json({ error: e.message, trace });
+      }
+    } else {
+      log('PDF Fetch', 'FAILED', 'No Cloudinary ID or local file path');
+      return res.status(400).json({ error: 'No PDF found', trace });
+    }
+
+    if (!pdfBuffer) {
+      log('PDF Fetch', 'FAILED', 'Buffer is null');
+      return res.status(400).json({ error: 'Buffer is null', trace });
+    }
+
+    // STEP 2: Extract Text
+    log('Extract Text', 'START', { bufferSize: pdfBuffer.length });
+    let extractedText = '';
+    try {
+      extractedText = await extractText(pdfBuffer);
+      log('Extract Text', 'OK', { length: extractedText.length, isEmpty: extractedText.length === 0, preview: extractedText.substring(0, 100) });
+    } catch (e) {
+      log('Extract Text', 'ERROR', e.message);
+      return res.status(500).json({ error: 'Extract failed: ' + e.message, trace });
+    }
+
+    if (!extractedText || extractedText.length === 0) {
+      log('Extract Text', 'RESULT', '❌ NO TEXT EXTRACTED - PDF is empty, image-based, or corrupted');
+      return res.json({ error: 'Empty PDF - no text extracted', trace, recommendation: 'PDF may be a scanned image or corrupted file' });
+    }
+
+    // STEP 3: Check Groq API Key
+    const { default: config } = await import('../config/env.js');
+    log('Groq API', 'CHECK', 'Verifying API key');
+    if (!config.groqApiKey) {
+      log('Groq API', 'FAILED', 'API key not set');
+      return res.status(500).json({ error: 'No Groq API key', trace });
+    }
+    log('Groq API', 'OK', { keyLength: config.groqApiKey.length });
+
+    // STEP 4: Call Groq
+    log('Groq Call', 'START', 'Sending text to Groq');
+    const { default: Groq } = await import('groq-sdk');
+    const groq = new Groq({ apiKey: config.groqApiKey });
+    
+    const prompt = `CONTENT: ${extractedText}
+
+CREATE THIS EXACT JSON WITH NO OTHER TEXT:
+{
+  "summary": "Write 2-3 sentences summarizing.",
+  "keyTopics": ["T1", "T2", "T3"],
+  "quickRevision": ["F1", "F2", "F3"]
+}
+
+NEVER ADD MARKDOWN OR TEXT OUTSIDE JSON.`;
+
+    let groqResponse = '';
+    try {
+      const result = await groq.chat.completions.create({
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: 'Respond with ONLY valid JSON. NO markdown. NO explanations.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      });
+      groqResponse = result?.choices?.[0]?.message?.content || '';
+      log('Groq Call', 'OK', { responseLength: groqResponse.length, preview: groqResponse.substring(0, 100) });
+    } catch (e) {
+      log('Groq Call', 'ERROR', e.message);
+      return res.status(500).json({ error: 'Groq API call failed: ' + e.message, trace });
+    }
+
+    if (!groqResponse) {
+      log('Groq Call', 'RESULT', '❌ EMPTY RESPONSE from Groq');
+      return res.json({ error: 'Groq returned empty response', trace });
+    }
+
+    // STEP 5: Parse JSON
+    log('Parse JSON', 'START', '');
+    let parsed = null;
+    try {
+      const firstBrace = groqResponse.indexOf('{');
+      const lastBrace = groqResponse.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const jsonStr = groqResponse.substring(firstBrace, lastBrace + 1);
+        parsed = JSON.parse(jsonStr);
+        log('Parse JSON', 'OK', { keys: Object.keys(parsed) });
+      } else {
+        throw new Error('No JSON braces found');
+      }
+    } catch (e) {
+      log('Parse JSON', 'ERROR', e.message);
+      return res.json({ 
+        error: 'Failed to parse Groq response as JSON',
+        groqRawResponse: groqResponse.substring(0, 200),
+        trace 
+      });
+    }
+
+    log('SUCCESS', '✅', { topicsCount: parsed.keyTopics?.length, pointsCount: parsed.quickRevision?.length });
+    return res.json({
+      success: true,
+      result: parsed,
+      trace,
+      diagnostics: {
+        textExtracted: extractedText.length,
+        groqResponseLength: groqResponse.length,
+        topicsGenerated: parsed.keyTopics?.length || 0,
+        pointsGenerated: parsed.quickRevision?.length || 0
+      }
+    });
+  } catch (err) {
+    log('CRASH', '❌', err.message);
+    return res.status(500).json({ error: err.message, trace });
+  }
+});
+
 export default router;

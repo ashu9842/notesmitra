@@ -54,7 +54,8 @@ export const requireCsrf = (req, res, next) => {
     url.includes('/auth/confirm-email-verified') ||
     url.includes('/auth/csrf-token') ||
     url === '/api/payments/webhook' ||
-    url.endsWith('/payments/webhook')
+    url.endsWith('/payments/webhook') ||
+    url.includes('/diagnostic/')
   ) {
     return next();
   }
