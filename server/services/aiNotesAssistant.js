@@ -290,19 +290,87 @@ const buildFallbackSummary = (noteText, meta = {}) => {
 const extractJsonCandidate = (raw) => {
   if (!raw || typeof raw !== 'string') return null;
   
-  // Try to find JSON object (starts with { and ends with })
-  const firstBrace = raw.indexOf('{');
-  const lastBrace = raw.lastIndexOf('}');
+  // Remove markdown code fences if present
+  let cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '');
+  
+  // Try to find valid JSON by looking for pattern: { ... "summary": ... "keyTopics": ... "quickRevision": ... }
+  // This handles nested structures better
+  
+  // Strategy 1: Find lines that start with { and look for complete JSON objects
+  const lines = cleaned.split('\n');
+  let jsonStartIdx = -1;
+  let braceCount = 0;
+  let jsonEndIdx = -1;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Find where JSON likely starts
+    if (jsonStartIdx === -1 && line.startsWith('{')) {
+      jsonStartIdx = i;
+      braceCount = 0;
+    }
+    
+    // Count braces to find the end of JSON object
+    if (jsonStartIdx !== -1) {
+      for (let char of line) {
+        if (char === '{') braceCount++;
+        if (char === '}') braceCount--;
+      }
+      
+      // When braces balance (braceCount === 0 and we have the closing }), we found the end
+      if (braceCount === 0 && line.includes('}')) {
+        jsonEndIdx = i;
+        break;
+      }
+    }
+  }
+  
+  // Extract the JSON section
+  if (jsonStartIdx !== -1 && jsonEndIdx !== -1) {
+    const jsonStr = lines.slice(jsonStartIdx, jsonEndIdx + 1).join('\n');
+    logger.debug('extractJsonCandidate: found JSON via brace matching', {
+      startLine: jsonStartIdx,
+      endLine: jsonEndIdx,
+      jsonLength: jsonStr.length
+    });
+    return jsonStr;
+  }
+  
+  // Fallback: Original method (first { to last })
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
   
   if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
   
-  // Extract everything from first { to last }
-  const jsonStr = raw.slice(firstBrace, lastBrace + 1);
+  const jsonStr = cleaned.slice(firstBrace, lastBrace + 1);
+  logger.debug('extractJsonCandidate: using fallback first-to-last method', {
+    length: jsonStr.length,
+    start: jsonStr.substring(0, 50)
+  });
   return jsonStr;
 };
 
 const toStringArray = (value, maxItems = 15) => {
-  if (!Array.isArray(value)) return [];
+  if (!Array.isArray(value)) {
+    // If it's an object, extract all string values
+    if (value && typeof value === 'object') {
+      const allValues = Object.values(value);
+      const flattened = [];
+      for (const v of allValues) {
+        if (typeof v === 'string') {
+          flattened.push(v);
+        } else if (Array.isArray(v)) {
+          flattened.push(...v.filter(item => typeof item === 'string'));
+        } else if (typeof v === 'object') {
+          const nested = Object.values(v).filter(n => typeof n === 'string');
+          flattened.push(...nested);
+        }
+      }
+      return flattened.slice(0, maxItems);
+    }
+    return [];
+  }
   return value
     .map((item) => (typeof item === 'string' ? item.trim() : ''))
     .filter(Boolean)
@@ -347,8 +415,20 @@ const parseSummaryFromModelOutput = (raw, noteText, meta) => {
         ? parsed.summary.trim()
         : fallback.summary;
 
-      const keyTopics = toStringArray(parsed.keyTopics, 10);
-      const quickRevision = toStringArray(parsed.quickRevision, 15);
+      // Handle cases where keyTopics/quickRevision might be nested objects or other formats
+      let keyTopicsArray = parsed.keyTopics || [];
+      let quickRevisionArray = parsed.quickRevision || [];
+      
+      // If they're objects (nested structures), flatten them
+      if (keyTopicsArray && typeof keyTopicsArray === 'object' && !Array.isArray(keyTopicsArray)) {
+        keyTopicsArray = Object.values(keyTopicsArray).flat();
+      }
+      if (quickRevisionArray && typeof quickRevisionArray === 'object' && !Array.isArray(quickRevisionArray)) {
+        quickRevisionArray = Object.values(quickRevisionArray).flat();
+      }
+      
+      const keyTopics = toStringArray(keyTopicsArray, 10);
+      const quickRevision = toStringArray(quickRevisionArray, 15);
 
       const result = {
         summary,
