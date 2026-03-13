@@ -78,6 +78,8 @@ router.get('/groq-health', async (req, res) => {
       }
     }
 
+    const workingModels = results.filter(r => r.status === 'working').length;
+    const allWorking = workingModels > 0;
 
     return res.status(allWorking ? 200 : 206).json({
       status: allWorking ? 'healthy' : 'degraded',
