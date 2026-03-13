@@ -10,14 +10,73 @@ const router = express.Router();
  */
 router.get('/groq-health', async (req, res) => {
   try {
+    const apiKey = config.groqApiKey;
+    
+    if (!apiKey) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'GROQ_API_KEY is not configured',
+        apiKeySet: false
+      });
+    }
+
+    // Lazy load Groq SDK
+    let Groq;
+    try {
+      const mod = await import('groq-sdk');
+      Groq = mod.default || mod;
+    } catch (err) {
+      logger.error('groq-health: Failed to import Groq SDK', { error: err.message });
+      return res.status(500).json({
+        status: 'error',
+        message: 'Groq SDK import failed',
+        error: err.message
+      });
+    }
+
+    const groq = new Groq({ apiKey });
+    const modelsToTest = ['llama-3.1-70b-versatile', 'llama-3.1-8b-instant'];
+    const results = [];
+
+    for (const modelName of modelsToTest) {
+      try {
+        const result = await groq.chat.completions.create({
+          model: modelName,
+          messages: [{ role: 'user', content: 'Hi, test message' }],
+          max_tokens: 50
+        });
+        const text = result?.choices?.[0]?.message?.content;
+        results.push({
+          model: modelName,
+          status: 'working',
+          response: text?.slice?.(0, 50),
+          error: null
+        });
+        logger.info(`groq-health: ${modelName} is working`);
+      } catch (err) {
+        results.push({
+          model: modelName,
+          status: 'error',
+          response: null,
+          error: err.message?.slice?.(0, 200)
+        });
+        logger.error(`groq-health: ${modelName} failed`, { error: err.message });
+      }
+    }
+
+    const working = results.filter(r => r.status === 'working').length;
     return res.json({
-      status: 'debug',
-      apiKey: config.groqApiKey ? 'SET' : 'NOT SET',
-      configs: Object.keys(config).slice(0, 10),
+      status: working > 0 ? 'healthy' : 'degraded',
+      message: `${working}/${modelsToTest.length} models responding`,
+      models: results,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    logger.error('groq-health error:', err.message);
+    return res.status(500).json({
+      status: 'error',
+      error: err.message
+    });
   }
 });
 
