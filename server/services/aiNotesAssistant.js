@@ -285,10 +285,16 @@ const buildFallbackSummary = (noteText, meta = {}) => {
 
 const extractJsonCandidate = (raw) => {
   if (!raw || typeof raw !== 'string') return null;
+  
+  // Try to find JSON object (starts with { and ends with })
   const firstBrace = raw.indexOf('{');
   const lastBrace = raw.lastIndexOf('}');
+  
   if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
-  return raw.slice(firstBrace, lastBrace + 1);
+  
+  // Extract everything from first { to last }
+  const jsonStr = raw.slice(firstBrace, lastBrace + 1);
+  return jsonStr;
 };
 
 const toStringArray = (value, maxItems = 15) => {
@@ -301,20 +307,27 @@ const toStringArray = (value, maxItems = 15) => {
 
 const parseSummaryFromModelOutput = (raw, noteText, meta) => {
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-  const candidates = [
-    cleaned,
-    extractJsonCandidate(cleaned),
-    extractJsonCandidate(raw),
+  
+  // Array of candidates to try parsing, in priority order
+  // 1. Try extracting JSON from markdown/text wrapper
+  // 2. Try cleaned markdown
+  // 3. Try original raw (in case it's already JSON)
+  const jsonCandidates = [
+    extractJsonCandidate(raw),      // Extract from original first (highest priority)
+    extractJsonCandidate(cleaned),  // Extract from cleaned
+    cleaned,                         // Try cleaned as-is
+    raw                              // Try raw as-is (last resort)
   ].filter(Boolean);
 
   logger.debug('parseSummaryFromModelOutput: attempting parse', {
     rawLength: raw.length,
     cleanedLength: cleaned.length,
-    candidateCount: candidates.length,
-    firstCandidate: candidates[0]?.slice?.(0, 100)
+    candidateCount: jsonCandidates.length,
+    firstCandidate: jsonCandidates[0]?.slice?.(0, 100),
+    allCandidates: jsonCandidates.map((c, i) => ({ index: i, length: c.length, start: c.substring(0, 40) }))
   });
 
-  for (const candidate of candidates) {
+  for (const candidate of jsonCandidates) {
     try {
       const parsed = JSON.parse(candidate);
       if (!parsed || typeof parsed !== 'object') continue;
@@ -358,7 +371,8 @@ const parseSummaryFromModelOutput = (raw, noteText, meta) => {
 
   logger.warn('parseSummaryFromModelOutput: all candidates failed, using fallback', {
     rawLength: raw.length,
-    candidateCount: candidates.length
+    candidateCount: jsonCandidates.length,
+    failedCandidates: jsonCandidates.map((c, i) => ({ index: i, length: c.length }))
   });
 
   return buildFallbackSummary(noteText, meta);
