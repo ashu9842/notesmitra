@@ -171,6 +171,9 @@ app.use(requestLogger);
 app.use(requestTimer);
 app.use(slowRequestLogger);
 
+// Diagnostic routes (must be BEFORE CSRF middleware so they don't require tokens)
+app.use('/api/diagnostic', diagnosticRoutes);
+
 // CSRF protection for state-changing requests
 app.use(requireCsrf);
 
@@ -323,7 +326,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/superadmin', superadminRoutes);
 app.use('/api/premium', premiumRoutes);
 app.use('/api/razorpay', razorpayRoutes);
-app.use('/api/diagnostic', diagnosticRoutes);
+// diagnostic routes are already mounted before CSRF middleware above
 
 // Root route
 app.get('/', (req, res) => {
