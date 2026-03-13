@@ -17,6 +17,30 @@ import logger from '../utils/logger.js';
 const require = createRequire(import.meta.url);
 const pdfParseLib = require('pdf-parse');
 
+const parsePdfText = async (pdfBuffer) => {
+  // pdf-parse v1: module itself is callable
+  if (typeof pdfParseLib === 'function') {
+    return pdfParseLib(pdfBuffer);
+  }
+
+  // Some builds expose default callable export
+  if (typeof pdfParseLib?.default === 'function') {
+    return pdfParseLib.default(pdfBuffer);
+  }
+
+  // pdf-parse v2: class-based API
+  if (typeof pdfParseLib?.PDFParse === 'function') {
+    const parser = new pdfParseLib.PDFParse({ data: pdfBuffer });
+    try {
+      return await parser.getText();
+    } finally {
+      await parser.destroy().catch(() => undefined);
+    }
+  }
+
+  throw new Error('pdf-parse parser function is unavailable');
+};
+
 // Extract up to 15 000 chars — enough context without overloading smaller models
 const MAX_CHARS = 15_000;
 
@@ -88,7 +112,7 @@ export const extractText = async (pdfBuffer) => {
 
   try {
     logger.info('📄 extractText: STARTING PDF PARSE', { bufferSize: pdfBuffer.length });
-    const data = await pdfParseLib(pdfBuffer);
+    const data = await parsePdfText(pdfBuffer);
     const text = (data.text || '').slice(0, MAX_CHARS).trim();
     
     // Check if extracted text is corrupted/gibberish
@@ -378,14 +402,28 @@ const sanitizeMetaText = (value) => {
   const cleaned = value.replace(/\s+/g, ' ').trim();
   if (!cleaned) return '';
 
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  const avgTokenLength = tokens.length
+    ? tokens.reduce((sum, token) => sum + token.length, 0) / tokens.length
+    : 0;
+
   // Keep short, human-like labels but remove obvious OCR/gibberish titles
   const letterCount = (cleaned.match(/[a-z]/gi) || []).length;
   const vowels = (cleaned.match(/[aeiou]/gi) || []).length;
   const vowelRatio = letterCount > 0 ? vowels / letterCount : 0;
   const hasLongConsonantRun = /[bcdfghjklmnpqrstvwxyz]{6,}/i.test(cleaned);
-  const hasHugeToken = cleaned.split(/\s+/).some((token) => token.length > 35);
+  const hasHugeToken = tokens.some((token) => token.length > 35);
+  const singleVeryLongToken = tokens.length === 1 && tokens[0].length > 18;
+  const suspiciousDenseTokens = avgTokenLength > 12 && tokens.length <= 2 && letterCount > 16;
 
-  if ((letterCount > 20 && vowelRatio < 0.2) || hasLongConsonantRun || hasHugeToken || isCorruptedText(cleaned)) {
+  if (
+    (letterCount > 20 && vowelRatio < 0.2) ||
+    hasLongConsonantRun ||
+    hasHugeToken ||
+    singleVeryLongToken ||
+    suspiciousDenseTokens ||
+    isCorruptedText(cleaned)
+  ) {
     return '';
   }
 
@@ -451,9 +489,17 @@ const buildFallbackSummary = (noteText, meta = {}) => {
     .filter((line) => line.length <= 90)
     .slice(0, 10);
   
-  const keyTopics = keyTopicsCandidate.length 
+  let keyTopics = keyTopicsCandidate.length 
     ? keyTopicsCandidate 
     : (sentences.slice(0, 5).map(s => s.split(/\s+/).slice(0, 5).join(' ')));
+
+  if (keyTopics.length === 0 && hasNoValidText) {
+    keyTopics = [
+      'Readable PDF text required',
+      'OCR processing may be needed',
+      'Re-upload for AI summary generation'
+    ];
+  }
 
   // Build quickRevision with multiple fallback strategies
   const candidateRevisionItems = [
@@ -878,7 +924,7 @@ export const chatAboutNote = async (pdfBuffer, meta, question, history = []) => 
   const apiKey = config.groqApiKey;
   if (!apiKey) {
     logger.error('aiNotesAssistant: GROQ_API_KEY is missing or empty for chat');
-    return buildFallbackChatAnswer(context.text, question, context.safeMeta, 'ai-unavailable');
+    return buildFallbackChatAnswer(noteText, question, context.safeMeta, 'ai-unavailable');
   }
 
   if (!context.text) {
@@ -927,7 +973,7 @@ Rules:
 
     if (!answer || !answer.trim()) {
       logger.warn('aiNotesAssistant: empty response from chat, using fallback');
-      return buildFallbackChatAnswer(context.text, question, context.safeMeta, 'ai-unavailable');
+      return buildFallbackChatAnswer(noteText, question, context.safeMeta, 'ai-unavailable');
     }
 
     logger.info('aiNotesAssistant: chatAboutNote answered successfully');
@@ -939,7 +985,7 @@ Rules:
       contextSource: context.source,
       questionLength: question?.length || 0
     });
-    return buildFallbackChatAnswer(context.text, question, context.safeMeta, 'ai-unavailable');
+    return buildFallbackChatAnswer(noteText, question, context.safeMeta, 'ai-unavailable');
   }
 };
 
