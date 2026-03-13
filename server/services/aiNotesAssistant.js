@@ -51,36 +51,40 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
       return text.trim();
     } catch (err) {
       const errStr = String(err.message || err).toLowerCase();
-      const statusCode = err.status || (err.message?.match(/\b(4\d{2}|5\d{2})\b/) || [])[0];
-      const isRetryable = 
-        errStr.includes('503') || 
-        errStr.includes('429') || 
-        errStr.includes('overloaded') ||
-        errStr.includes('timeout') ||
-        statusCode === 503 ||
-        statusCode === 429;
+      const statusMatch = err.status || parseInt(err.message?.match(/\b(4\d{2}|5\d{2})\b/)?.[0], 10);
+      const statusCode = typeof statusMatch === 'number' ? statusMatch : null;
+      
+      // Check for specific error types
+      const isAuthError = errStr.includes('api key') || errStr.includes('unauthorized') || errStr.includes('403') || errStr.includes('401');
+      const isRateLimited = errStr.includes('503') || errStr.includes('429') || errStr.includes('overloaded') || statusCode === 503 || statusCode === 429;
+      const isTimeout = errStr.includes('timeout') || errStr.includes('econnrefused');
+      const isInvalidModel = errStr.includes('model') && errStr.includes('not found');
+      
+      const isRetryable = isRateLimited || isTimeout;
+      const isFatal = isAuthError || isInvalidModel;
       
       logger.warn(
-        `aiNotesAssistant: ${modelName} failed (${isRetryable ? 'retryable' : 'fatal'})`,
+        `aiNotesAssistant: ${modelName} failed (${isRetryable ? 'retryable' : isFatal ? 'fatal-auth' : 'fatal'})`,
         { 
-          error: err.message?.slice?.(0, 180) || String(err),
-          status: statusCode
+          error: err.message?.slice?.(0, 200) || String(err),
+          status: statusCode,
+          errorType: { isAuthError, isRateLimited, isTimeout, isInvalidModel }
         }
       );
       
       lastErr = err;
       
-      // Stop retrying on auth/not-found errors (401, 403, 404)
-      if (!isRetryable && (statusCode === 401 || statusCode === 403 || statusCode === 404)) {
-        logger.error(`aiNotesAssistant: fatal error, stopping retry chain`, { status: statusCode });
+      // Stop retrying immediately on auth/API key/model errors
+      if (isFatal) {
+        logger.error(`aiNotesAssistant: fatal error, stopping retry chain`, { 
+          status: statusCode,
+          modelName,
+          reason: isAuthError ? 'auth-error' : 'invalid-model'
+        });
         break;
       }
       
-      // Continue to next model if retryable
-      if (!isRetryable) {
-        // Non-retryable but not auth error — try next model anyway
-        continue;
-      }
+      // Continue to next model if retryable or unknown error
     }
   }
   

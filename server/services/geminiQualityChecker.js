@@ -187,23 +187,33 @@ Respond with the JSON object only.`;
       break; // success
     } catch (err) {
       const errStr = String(err.message || err).toLowerCase();
-      const statusCode = err.status || (err.message?.match(/\b(4\d{2}|5\d{2})\b/) || [])[0];
-      const isRetryable = 
-        errStr.includes('503') || 
-        errStr.includes('429') || 
-        errStr.includes('overloaded') || 
-        errStr.includes('timeout') ||
-        statusCode === 503 || 
-        statusCode === 429 ||
-        (errStr.includes('404') && errStr.includes('model'));
+      const statusMatch = err.status || parseInt(err.message?.match(/\b(4\d{2}|5\d{2})\b/)?.[0], 10);
+      const statusCode = typeof statusMatch === 'number' ? statusMatch : null;
       
-      logger.warn(`geminiQualityChecker: ${modelName} failed (${isRetryable ? 'retryable' : 'fatal'})`, { 
-        error: err.message?.slice?.(0, 180) || String(err),
-        status: statusCode
+      // Check for specific error types
+      const isAuthError = errStr.includes('api key') || errStr.includes('unauthorized') || errStr.includes('403') || errStr.includes('401');
+      const isRateLimited = errStr.includes('503') || errStr.includes('429') || errStr.includes('overloaded') || statusCode === 503 || statusCode === 429;
+      const isTimeout = errStr.includes('timeout') || errStr.includes('econnrefused');
+      const isInvalidModel = (errStr.includes('404') && errStr.includes('model')) || errStr.includes('not found');
+      
+      const isRetryable = isRateLimited || isTimeout;
+      const isFatal = isAuthError || isInvalidModel;
+      
+      logger.warn(`geminiQualityChecker: ${modelName} failed (${isRetryable ? 'retryable' : isFatal ? 'fatal-auth' : 'fatal'})`, { 
+        error: err.message?.slice?.(0, 200) || String(err),
+        status: statusCode,
+        errorType: { isAuthError, isRateLimited, isTimeout, isInvalidModel }
       });
       
       lastErr = err;
-      if (!isRetryable) break;
+      if (isFatal) {
+        logger.error(`geminiQualityChecker: fatal error, stopping retry chain`, {
+          status: statusCode,
+          modelName,
+          reason: isAuthError ? 'auth-error' : 'invalid-model'
+        });
+        break;
+      }
     }
   }
   if (!raw) throw lastErr || new Error('All Gemini models failed or API key is invalid');
