@@ -176,14 +176,36 @@ Respond with the JSON object only.`;
   let lastErr;
   for (const modelName of MODEL_CHAIN) {
     try {
+      logger.debug(`geminiQualityChecker: trying model ${modelName}`);
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
-      const text = result.response?.text?.();
+      
+      // Handle various response formats
+      let text;
+      if (result.response?.text && typeof result.response.text === 'function') {
+        text = result.response.text();
+      } else if (result.response?.text && typeof result.response.text === 'string') {
+        text = result.response.text;
+      } else if (typeof result.response === 'string') {
+        text = result.response;
+      } else if (result.text && typeof result.text === 'function') {
+        text = result.text();
+      } else if (result.text && typeof result.text === 'string') {
+        text = result.text;
+      }
+      
+      text = typeof text === 'string' ? text.trim() : null;
+      
       if (!text) {
+        logger.warn(`geminiQualityChecker: ${modelName} returned empty response`, {
+          responseKeys: result.response ? Object.keys(result.response) : 'no response',
+          hasText: !!result.response?.text
+        });
         throw new Error(`Empty response from ${modelName}`);
       }
-      raw = text.trim();
-      logger.info(`geminiQualityChecker: ${modelName} succeeded`);
+      
+      raw = text;
+      logger.info(`geminiQualityChecker: ${modelName} succeeded`, { responseLength: text.length });
       break; // success
     } catch (err) {
       const errStr = String(err.message || err).toLowerCase();

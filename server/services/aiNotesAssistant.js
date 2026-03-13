@@ -45,14 +45,37 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
   
   for (const modelName of MODEL_CHAIN) {
     try {
+      logger.debug(`aiNotesAssistant: trying model ${modelName}`);
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(promptOrContents);
-      const text = result.response?.text?.();
+      
+      // Handle various response formats
+      let text;
+      if (result.response?.text && typeof result.response.text === 'function') {
+        text = result.response.text();
+      } else if (result.response?.text && typeof result.response.text === 'string') {
+        text = result.response.text;
+      } else if (typeof result.response === 'string') {
+        text = result.response;
+      } else if (result.text && typeof result.text === 'function') {
+        text = result.text();
+      } else if (result.text && typeof result.text === 'string') {
+        text = result.text;
+      }
+      
+      text = typeof text === 'string' ? text.trim() : null;
+      
       if (!text) {
+        logger.warn(`aiNotesAssistant: ${modelName} returned empty response`, {
+          responseKeys: result.response ? Object.keys(result.response) : 'no response',
+          hasText: !!result.response?.text,
+          textType: typeof result.response?.text
+        });
         throw new Error(`Empty response from ${modelName}`);
       }
-      logger.info(`aiNotesAssistant: ${modelName} succeeded`);
-      return text.trim();
+      
+      logger.info(`aiNotesAssistant: ${modelName} succeeded`, { responseLength: text.length });
+      return text;
     } catch (err) {
       const errStr = String(err.message || err).toLowerCase();
       const statusMatch = err.status || parseInt(err.message?.match(/\b(4\d{2}|5\d{2})\b/)?.[0], 10);
@@ -61,17 +84,18 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
       // Check for specific error types
       const isAuthError = errStr.includes('api key') || errStr.includes('unauthorized') || errStr.includes('403') || errStr.includes('401');
       const isRateLimited = errStr.includes('503') || errStr.includes('429') || errStr.includes('overloaded') || statusCode === 503 || statusCode === 429;
-      const isTimeout = errStr.includes('timeout') || errStr.includes('econnrefused');
+      const isTimeout = errStr.includes('timeout') || errStr.includes('econnrefused') || errStr.includes('deadline') || errStr.includes('econnreset');
       const isInvalidModel = errStr.includes('model') && errStr.includes('not found');
       
       const isRetryable = isRateLimited || isTimeout;
       const isFatal = isAuthError || isInvalidModel;
       
       logger.warn(
-        `aiNotesAssistant: ${modelName} failed (${isRetryable ? 'retryable' : isFatal ? 'fatal-auth' : 'fatal'})`,
+        `aiNotesAssistant: ${modelName} failed (${isRetryable ? 'retryable' : isFatal ? 'fatal-auth' : 'non-fatal'})`,
         { 
-          error: err.message?.slice?.(0, 200) || String(err),
+          fullError: err.message?.slice?.(0, 300) || String(err),
           status: statusCode,
+          modelName,
           errorType: { isAuthError, isRateLimited, isTimeout, isInvalidModel }
         }
       );
@@ -88,7 +112,7 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
         break;
       }
       
-      // Continue to next model if retryable or unknown error
+      // Continue to next model if retryable or non-fatal error
     }
   }
   
@@ -223,10 +247,23 @@ const parseSummaryFromModelOutput = (raw, noteText, meta) => {
     extractJsonCandidate(raw),
   ].filter(Boolean);
 
+  logger.debug('parseSummaryFromModelOutput: attempting parse', {
+    rawLength: raw.length,
+    cleanedLength: cleaned.length,
+    candidateCount: candidates.length,
+    firstCandidate: candidates[0]?.slice?.(0, 100)
+  });
+
   for (const candidate of candidates) {
     try {
       const parsed = JSON.parse(candidate);
       if (!parsed || typeof parsed !== 'object') continue;
+
+      logger.debug('parseSummaryFromModelOutput: JSON parsed successfully', {
+        hasSummary: !!parsed.summary,
+        keyTopicsCount: Array.isArray(parsed.keyTopics) ? parsed.keyTopics.length : 0,
+        quickRevisionCount: Array.isArray(parsed.quickRevision) ? parsed.quickRevision.length : 0
+      });
 
       const fallback = buildFallbackSummary(noteText, meta);
       const summary = typeof parsed.summary === 'string' && parsed.summary.trim()
@@ -236,15 +273,33 @@ const parseSummaryFromModelOutput = (raw, noteText, meta) => {
       const keyTopics = toStringArray(parsed.keyTopics, 10);
       const quickRevision = toStringArray(parsed.quickRevision, 15);
 
-      return {
+      const result = {
         summary,
         keyTopics: keyTopics.length ? keyTopics : fallback.keyTopics,
         quickRevision: quickRevision.length ? quickRevision : fallback.quickRevision,
       };
-    } catch {
+
+      logger.info('parseSummaryFromModelOutput: successfully parsed and returned', {
+        summaryLength: result.summary.length,
+        keyTopicsCount: result.keyTopics.length,
+        quickRevisionCount: result.quickRevision.length,
+        source: 'ai-generated'
+      });
+
+      return result;
+    } catch (err) {
+      logger.debug('parseSummaryFromModelOutput: JSON parse failed for candidate', {
+        candidateStart: candidate?.slice?.(0, 50),
+        error: err.message
+      });
       // try next candidate
     }
   }
+
+  logger.warn('parseSummaryFromModelOutput: all candidates failed, using fallback', {
+    rawLength: raw.length,
+    candidateCount: candidates.length
+  });
 
   return buildFallbackSummary(noteText, meta);
 };
