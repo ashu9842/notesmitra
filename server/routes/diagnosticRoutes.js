@@ -1,5 +1,4 @@
 import express from 'express';
-import Groq from 'groq-sdk';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
 
@@ -19,6 +18,20 @@ router.get('/groq-health', async (req, res) => {
         message: 'GROQ_API_KEY is not configured',
         apiKeySet: false,
         models: []
+      });
+    }
+
+    // Lazy load Groq to avoid crashes if SDK not available
+    let Groq;
+    try {
+      const groqModule = await import('groq-sdk');
+      Groq = groqModule.default;
+    } catch (err) {
+      logger.error('groq-health: Failed to import Groq SDK', { error: err.message });
+      return res.status(500).json({
+        status: 'error',
+        message: 'Groq SDK failed to load',
+        error: err.message || 'Import failed'
       });
     }
 

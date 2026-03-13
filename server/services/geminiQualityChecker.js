@@ -17,7 +17,6 @@
  *   - Any network / API error occurs
  */
 
-import Groq from 'groq-sdk';
 import { createRequire } from 'module';
 import config from '../config/env.js';
 import logger from '../utils/logger.js';
@@ -72,6 +71,16 @@ const extractText = async (pdfBuffer) => {
 const analyseWithGroq = async (extractedText, pageCount, totalChars) => {
   const apiKey = config.groqApiKey;
   if (!apiKey) throw new Error('GROQ_API_KEY is not configured');
+
+  // Lazy load Groq SDK to avoid crashes if not available
+  let Groq;
+  try {
+    const groqModule = await import('groq-sdk');
+    Groq = groqModule.default;
+  } catch (err) {
+    logger.error('geminiQualityChecker: Failed to import Groq SDK', { error: err.message });
+    throw new Error(`Groq SDK import failed: ${err.message}`);
+  }
 
   const groq = new Groq({ apiKey });
   // Model fallback chain — skip overloaded/rate-limited models automatically

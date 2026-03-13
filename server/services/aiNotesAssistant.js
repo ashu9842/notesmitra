@@ -9,7 +9,6 @@
  * rate-limited, it automatically retries with the next available model.
  */
 
-import Groq from 'groq-sdk';
 import { createRequire } from 'module';
 import crypto from 'crypto';
 import config from '../config/env.js';
@@ -85,6 +84,16 @@ const MODEL_CHAIN = [
 ];
 
 const generateWithFallback = async (apiKey, promptOrContents) => {
+  // Lazy load Groq SDK to avoid crashes if not available
+  let Groq;
+  try {
+    const groqModule = await import('groq-sdk');
+    Groq = groqModule.default;
+  } catch (err) {
+    logger.error('aiNotesAssistant: Failed to import Groq SDK', { error: err.message });
+    throw new Error(`Groq SDK import failed: ${err.message}`);
+  }
+
   const groq = new Groq({ apiKey });
   let lastErr;
   
