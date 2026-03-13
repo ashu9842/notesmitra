@@ -325,10 +325,13 @@ const buildFallbackSummary = (noteText, meta = {}) => {
   const title = meta.title || 'this note';
   const subject = meta.subject || 'this subject';
 
+  // Check if we have NO valid text (empty or corrupted)
+  const hasNoValidText = noteText.length === 0;
+
   // Improved fallback message that indicates PDF issue if no text extracted
   const summary = summarySentences.length
     ? summarySentences.join(' ')
-    : noteText.length === 0
+    : hasNoValidText
       ? `⚠️ Unable to extract text from this PDF. The file may be a scanned image, corrupted, or password-protected. Please upload a digital PDF or an OCR-processed version for proper summarization.`
       : `A concise summary could not be generated from ${title}. This note appears to cover important points for ${subject}. Please review the key topics and quick revision points below.`;
 
@@ -354,13 +357,28 @@ const buildFallbackSummary = (noteText, meta = {}) => {
       .filter((item) => item.length >= 15) // More lenient minimum length
   ).slice(0, 12);
 
-  // If still empty, create basic revision points from note title/subject
-  if (quickRevision.length === 0 && (title || subject)) {
-    quickRevision = [
-      `Topic: ${title || subject}`,
-      'Refer to the note content for detailed information',
-      'Review key sections carefully before exam'
-    ];
+  // If still empty, create basic revision points
+  // BUT: if no valid text extracted, DON'T include the title (might be corrupted)
+  if (quickRevision.length === 0) {
+    if (hasNoValidText) {
+      quickRevision = [
+        'Verify the PDF file is readable and not corrupted',
+        'Consider uploading an OCR-processed version if it is a scanned document',
+        'Check that the file has selectable text content'
+      ];
+    } else if (subject) {
+      quickRevision = [
+        `Subject: ${subject}`,
+        'Refer to the note content for detailed information',
+        'Review key sections carefully before exam'
+      ];
+    } else {
+      quickRevision = [
+        'Review the note content carefully',
+        'Focus on key concepts and definitions',
+        'Practice with these topics before exam'
+      ];
+    }
   }
 
   // Log what we're returning
