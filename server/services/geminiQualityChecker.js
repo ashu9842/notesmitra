@@ -83,12 +83,11 @@ const analyseWithGroq = async (extractedText, pageCount, totalChars) => {
   }
 
   const groq = new Groq({ apiKey });
-  // Model fallback chain — skip overloaded/rate-limited/decommissioned models automatically
-  // Using Groq's current available models
-  // Last verified: llama-3.1-8b-instant is stable, older models decommissioned
+  // Model fallback chain — currently using only confirmed working models
+  // Groq frequently decommissions models, so we prioritize what's proven to work
   const MODEL_CHAIN = [
-    'mixtral-8x7b-32768',       // May be deprecated, but worth trying first
-    'llama-3.1-8b-instant',     // Confirmed working - always fallback
+    'llama-3.1-8b-instant',     // Confirmed working & reliable
+    'mixtral-8x7b-32768',       // Fallback (may be decommissioned, but worth trying)
   ];
 
   const avgCharsPerPage = pageCount > 0 ? Math.round(totalChars / pageCount) : 0;

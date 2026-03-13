@@ -76,13 +76,12 @@ const setCachedSummary = async (noteText, title, subject, summary) => {
 };
 
 // ─── Model fallback chain ────────────────────────────────────────────────────
-// Tries models in order; skips any that are decommissioned or return 429 (quota).
-// Using Groq's current available models - fast & free
-// Last verified: llama-3.1-8b-instant is stable, mixtral/llama70b decommissioned
-// Chain continues even if a model is decommissioned (treated as retryable error)
+// Currently using only confirmed working models on Groq's free tier
+// Last verified: llama-3.1-8b-instant is stable and reliable
+// Mixtral & llama-3.1-70b have been decommissioned by Groq
 const MODEL_CHAIN = [
-  'mixtral-8x7b-32768',       // May be deprecated, but worth trying first
-  'llama-3.1-8b-instant',     // Confirmed working - always fallback
+  'llama-3.1-8b-instant',     // Confirmed working & reliable
+  'mixtral-8x7b-32768',       // Fallback (may be decommissioned, but worth trying)
 ];
 
 const generateWithFallback = async (apiKey, promptOrContents) => {
