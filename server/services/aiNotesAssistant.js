@@ -32,9 +32,9 @@ const extractText = async (pdfBuffer) => {
 
 // ─── Model fallback chain ────────────────────────────────────────────────────
 // Tries models in order; skips any that return 503 (overloaded) or 429 (quota).
-// Updated to use only validated, currently-available Gemini models.
+// Using officially available Gemini models
 const MODEL_CHAIN = [
-  'gemini-2.0-flash-exp',
+  'gemini-pro',
   'gemini-1.5-flash',
   'gemini-1.5-pro',
 ];
