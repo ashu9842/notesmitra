@@ -120,6 +120,11 @@ const generateWithFallback = async (apiKey, promptOrContents) => {
       let text = result?.choices?.[0]?.message?.content;
       text = typeof text === 'string' ? text.trim() : null;
       
+      logger.debug(`aiNotesAssistant: ${modelName} raw response`, { 
+        textLength: text?.length,
+        textStart: text?.substring?.(0, 100)
+      });
+      
       if (!text) {
         logger.warn(`aiNotesAssistant: ${modelName} returned empty response`, {
           hasContent: !!result?.choices?.[0]?.message?.content,
@@ -451,7 +456,18 @@ Rules:
     }
 
     // ❌ NOT IN CACHE → GENERATE WITH AI
+    logger.debug('aiNotesAssistant: cache miss, calling generateWithFallback', { 
+      apiKeyLength: apiKey?.length,
+      promptLength: prompt.length
+    });
+    
     const raw = await generateWithFallback(apiKey, prompt);
+    
+    logger.debug('aiNotesAssistant: Groq response received', { 
+      responseLength: raw?.length,
+      responseStart: raw?.substring?.(0, 150)
+    });
+    
     const parsed = parseSummaryFromModelOutput(raw, noteText, meta);
     
     // ✅ STORE IN CACHE FOR 7 DAYS

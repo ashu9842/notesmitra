@@ -5,6 +5,71 @@ import logger from '../utils/logger.js';
 const router = express.Router();
 
 /**
+ * Test raw Groq response (no JSON parsing)
+ * POST /diagnostic/test-raw-groq
+ */
+router.post('/test-raw-groq', async (req, res) => {
+  try {
+    const apiKey = config.groqApiKey;
+    if (!apiKey) {
+      return res.status(500).json({ error: 'GROQ_API_KEY not set' });
+    }
+
+    let Groq;
+    try {
+      const mod = await import('groq-sdk');
+      Groq = mod.default || mod;
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to import Groq SDK: ' + err.message });
+    }
+
+    const groq = new Groq({ apiKey });
+    const prompt = `You are a study assistant. Create a structured summary with JSON format.
+    
+Provide response as:
+{
+  "summary": "Brief overview",
+  "keyTopics": ["topic1", "topic2"],
+  "quickRevision": ["point1", "point2"]
+}`;
+
+    const modelName = 'llama-3.1-8b-instant';
+    const result = await groq.chat.completions.create({
+      model: modelName,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 500,
+      top_p: 1
+    });
+
+    const text = result?.choices?.[0]?.message?.content || '';
+    
+    return res.json({
+      status: 'success',
+      model: modelName,
+      rawResponse: text,
+      length: text.length,
+      firstChars: text.substring(0, 200),
+      isJson: text.trim().startsWith('{'),
+      canParse: (() => {
+        try {
+          JSON.parse(text);
+          return true;
+        } catch {
+          return false;
+        }
+      })()
+    });
+  } catch (err) {
+    logger.error('test-raw-groq error:', err.message);
+    return res.status(500).json({ 
+      error: err.message,
+      stack: err.stack?.split('\n').slice(0, 3)
+    });
+  }
+});
+
+/**
  * Health check for Groq AI configuration and connectivity
  * GET /diagnostic/groq-health
  */
