@@ -19,6 +19,45 @@ interface AISummary {
   quickRevision: string[];
 }
 
+const normalizeAssistantAnswer = (value: unknown) => {
+  if (typeof value !== "string") {
+    return "Sorry, I could not generate a response.";
+  }
+
+  const text = value.trim();
+  if (!text) {
+    return "Sorry, I could not generate a response.";
+  }
+
+  const looksJson = (text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"));
+  if (!looksJson) {
+    return text;
+  }
+
+  try {
+    const parsed = JSON.parse(text) as { error?: string; message?: string; answer?: string; response?: string };
+    const answer = typeof parsed.answer === "string"
+      ? parsed.answer.trim()
+      : (typeof parsed.response === "string" ? parsed.response.trim() : "");
+
+    if (answer) {
+      return answer;
+    }
+
+    const errorMessage = typeof parsed.error === "string"
+      ? parsed.error
+      : (typeof parsed.message === "string" ? parsed.message : "");
+
+    if (errorMessage) {
+      return "AI is temporarily unavailable. Please try again in a moment.";
+    }
+  } catch {
+    return text;
+  }
+
+  return text;
+};
+
 interface AINoteAssistantProps {
   note: Note;
 }
@@ -85,7 +124,7 @@ export function AINoteAssistant({ note }: AINoteAssistantProps) {
       const data = await notesAPI.aiChat(note.id, question, history);
       const aiMsg: ChatMessage = {
         role: "assistant",
-        content: data.answer || "Sorry, I could not generate a response.",
+        content: normalizeAssistantAnswer(data?.answer),
         timestamp: new Date(),
       };
       setMessages(prev => [...prev, aiMsg]);

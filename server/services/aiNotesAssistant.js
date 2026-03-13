@@ -194,12 +194,52 @@ const setCachedSummary = async (contextText, meta = {}, contextSource = 'pdf-tex
 
 // ─── Model fallback chain ────────────────────────────────────────────────────
 // Currently using only confirmed working models on Groq's free tier
-// Last verified: llama-3.1-8b-instant is stable and reliable
-// Mixtral & llama-3.1-70b have been decommissioned by Groq
+// Keep the chain conservative to avoid malformed provider-side fallback payloads.
 const MODEL_CHAIN = [
   'llama-3.1-8b-instant',
-  'mixtral-8x7b-32768',
 ];
+
+const normalizeModelOutputText = (rawText, mode = 'summary') => {
+  const text = typeof rawText === 'string' ? rawText.trim() : '';
+  if (!text) return '';
+
+  const looksJson = (text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'));
+  if (!looksJson) return text;
+
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return text;
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return text;
+  }
+
+  const errorLike = typeof parsed.error === 'string'
+    ? parsed.error
+    : (typeof parsed.message === 'string' ? parsed.message : '');
+
+  const hasSummaryShape =
+    typeof parsed.summary === 'string' ||
+    Array.isArray(parsed.keyTopics) ||
+    Array.isArray(parsed.quickRevision);
+
+  const chatAnswer = typeof parsed.answer === 'string'
+    ? parsed.answer.trim()
+    : (typeof parsed.response === 'string' ? parsed.response.trim() : '');
+
+  if (errorLike && !hasSummaryShape && !chatAnswer) {
+    throw new Error(`Model returned error payload: ${errorLike}`);
+  }
+
+  if (mode === 'chat' && chatAnswer) {
+    return chatAnswer;
+  }
+
+  return text;
+};
 
 const toGroqMessages = (requestPayload) => {
   if (typeof requestPayload === 'string') {
@@ -306,6 +346,12 @@ const generateWithFallback = async (apiKey, requestPayload) => {
           contentType: typeof result?.choices?.[0]?.message?.content
         });
         throw new Error(`Empty response from ${modelName}`);
+      }
+
+      text = normalizeModelOutputText(text, mode);
+
+      if (!text) {
+        throw new Error(`Empty normalized response from ${modelName}`);
       }
       
       logger.info(`aiNotesAssistant: ${modelName} succeeded`, { responseLength: text.length });
