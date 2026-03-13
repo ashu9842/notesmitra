@@ -42,7 +42,7 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
   const [upiId, setUpiId] = useState("");
   const [isWithdrawDialogOpen, setIsWithdrawDialogOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showBalance, setShowBalance] = useState(false);
+  const [showBalance, setShowBalance] = useState(true);
   const [topUpAmount, setTopUpAmount] = useState("");
   const [isTopUpDialogOpen, setIsTopUpDialogOpen] = useState(false);
   const [isTopUpProcessing, setIsTopUpProcessing] = useState(false);
