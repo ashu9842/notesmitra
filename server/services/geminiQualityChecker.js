@@ -75,13 +75,11 @@ const analyseWithGemini = async (extractedText, pageCount, totalChars) => {
 
   const genAI = new GoogleGenerativeAI(apiKey);
   // Model fallback chain — skip overloaded/rate-limited models automatically
+  // Updated to use only validated, currently-available Gemini models
   const MODEL_CHAIN = [
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'gemini-flash-latest',
-    'gemini-flash-lite-latest',
-    'gemini-2.5-flash-lite',
     'gemini-1.5-flash-latest',
+    'gemini-1.5-flash',
+    'gemini-pro',
   ];
 
   const avgCharsPerPage = pageCount > 0 ? Math.round(totalChars / pageCount) : 0;
@@ -180,21 +178,35 @@ Respond with the JSON object only.`;
     try {
       const model = genAI.getGenerativeModel({ model: modelName });
       const result = await model.generateContent(prompt);
-      raw = result.response.text().trim();
+      const text = result.response?.text?.();
+      if (!text) {
+        throw new Error(`Empty response from ${modelName}`);
+      }
+      raw = text.trim();
+      logger.info(`geminiQualityChecker: ${modelName} succeeded`);
       break; // success
     } catch (err) {
-      const message = err?.message || '';
-      const isRetryable =
-        message.includes('503') ||
-        message.includes('429') ||
-        message.toLowerCase().includes('overloaded') ||
-        (message.includes('404') && message.toLowerCase().includes('model'));
-      logger.warn(`geminiQualityChecker: model ${modelName} failed (${isRetryable ? 'retryable' : 'fatal'})`, { error: err.message.slice(0, 120) });
+      const errStr = String(err.message || err).toLowerCase();
+      const statusCode = err.status || (err.message?.match(/\b(4\d{2}|5\d{2})\b/) || [])[0];
+      const isRetryable = 
+        errStr.includes('503') || 
+        errStr.includes('429') || 
+        errStr.includes('overloaded') || 
+        errStr.includes('timeout') ||
+        statusCode === 503 || 
+        statusCode === 429 ||
+        (errStr.includes('404') && errStr.includes('model'));
+      
+      logger.warn(`geminiQualityChecker: ${modelName} failed (${isRetryable ? 'retryable' : 'fatal'})`, { 
+        error: err.message?.slice?.(0, 180) || String(err),
+        status: statusCode
+      });
+      
       lastErr = err;
       if (!isRetryable) break;
     }
   }
-  if (!raw) throw lastErr;
+  if (!raw) throw lastErr || new Error('All Gemini models failed or API key is invalid');
 
   // Strip optional markdown code fences if the model includes them
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
