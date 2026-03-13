@@ -34,9 +34,9 @@ const extractText = async (pdfBuffer) => {
 // Tries models in order; skips any that return 503 (overloaded) or 429 (quota).
 // Updated to use only validated, currently-available Gemini models.
 const MODEL_CHAIN = [
-  'gemini-1.5-flash-latest',
+  'gemini-2.0-flash-exp',
   'gemini-1.5-flash',
-  'gemini-pro',
+  'gemini-1.5-pro',
 ];
 
 const generateWithFallback = async (apiKey, promptOrContents) => {
