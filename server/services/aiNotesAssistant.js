@@ -20,29 +20,56 @@ const pdfParseLib = require('pdf-parse');
 // Extract up to 15 000 chars — enough context without overloading smaller models
 const MAX_CHARS = 15_000;
 
-// Detect if text is corrupted/gibberish (too many repeated character patterns, no real words, etc)
+// Detect if text is corrupted/gibberish
 const isCorruptedText = (text) => {
   if (!text || text.length < 20) return false;
   
-  // Check 1: Repeated meaningless character patterns (e.g., "aaaaaa", "vvvvv")
-  const repeatedPatterns = /(.)\1{5,}/g;
-  const repeats = text.match(repeatedPatterns) || [];
-  if (repeats.length > text.length / 100) { // More than 1% repeating chars
+  // Check 1: Look for repeated short patterns (e.g., "bherv bherv bherv" = corrupted OCR)
+  const words = text.toLowerCase().split(/\s+/);
+  if (words.length >= 3) {
+    // Count word frequency - if one word appears >30%, it's likely corrupted repetition
+    const wordFreq = {};
+    words.forEach(w => {
+      wordFreq[w] = (wordFreq[w] || 0) + 1;
+    });
+    const maxFreq = Math.max(...Object.values(wordFreq));
+    if (maxFreq / words.length > 0.3) { // One word >30% = likely corrupted
+      return true;
+    }
+  }
+  
+  // Check 2: Count ratio of vowels to consonants - gibberish has unusual ratio
+  const vowels = (text.match(/[aeiouAEIOU]/g) || []).length;
+  const consonants = (text.match(/[bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ]/g) || []).length;
+  if (consonants > 0) {
+    const ratio = vowels / consonants;
+    if (ratio < 0.15 && consonants > 50) { // Way too few vowels = gibberish
+      return true;
+    }
+  }
+  
+  // Check 3: Check for ASCII-printable characters - corrupted PDFs often have weird chars
+  const nonPrintable = (text.match(/[^\x20-\x7E\n\r\t]/g) || []).length;
+  if (nonPrintable / text.length > 0.1) { // >10% non-printable = corrupted
     return true;
   }
   
-  // Check 2: Excessive consonant clusters without vowels (gibberish indicator)
-  const consonantClusters = /[bcdfghjklmnpqrstvwxyz]{6,}/gi;
-  const clusters = text.match(consonantClusters) || [];
-  if (clusters.length > 3) {
+  // Check 4: Look for very long words with no spaces - typical of corrupted text
+  const longestWord = Math.max(...words.map(w => w.length));
+  if (longestWord > 40 && text.length < 500) { // One 40+ char word in short text = likely corrupted
     return true;
   }
   
-  // Check 3: Common words present? If NO real words, it's likely corrupted
-  const realWordPatterns = /\b(the|and|or|is|are|be|was|were|have|has|do|does|will|would|could|should|can|may|might|must|should|this|that|these|those|which|what|who|where|when|why|how|if|as|to|for|in|on|at|by|of|from|with|about|out|into|through|during|before|after|above|below|up|down|between|among|under|over|through|during)\b/gi;
-  const wordMatches = text.match(realWordPatterns) || [];
-  const wordRatio = wordMatches.length / (text.split(/\s+/).length || 1);
-  if (wordRatio < 0.05 && text.length > 100) { // Less than 5% real words
+  // Check 5: Too high consonant density in small chunks (e.g., "vrb", "bhry")
+  const chunks = text.match(/.{1,4}/g) || [];
+  let highConsonantChunks = 0;
+  chunks.forEach(chunk => {
+    const chunkConsonants = (chunk.match(/[bcdfghjklmnpqrstvwxyz]/gi) || []).length;
+    if (chunkConsonants > 2.5) { // >2.5 consonants in 4 chars = too high
+      highConsonantChunks++;
+    }
+  });
+  if (highConsonantChunks / chunks.length > 0.6) { // >60% of chunks = corrupted
     return true;
   }
   
