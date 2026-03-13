@@ -6,7 +6,26 @@ import logger from '../utils/logger.js';
 
 const require = createRequire(import.meta.url);
 const pdfParseLib = require('pdf-parse');
-const parsePDF = async (buf) => pdfParseLib(buf);
+const parsePDF = async (pdfBuffer) => {
+  if (typeof pdfParseLib === 'function') {
+    return pdfParseLib(pdfBuffer);
+  }
+
+  if (typeof pdfParseLib?.default === 'function') {
+    return pdfParseLib.default(pdfBuffer);
+  }
+
+  if (typeof pdfParseLib?.PDFParse === 'function') {
+    const parser = new pdfParseLib.PDFParse({ data: pdfBuffer });
+    try {
+      return await parser.getText();
+    } finally {
+      await parser.destroy().catch(() => undefined);
+    }
+  }
+
+  throw new Error('pdf-parse parser function is unavailable');
+};
 
 /**
  * Advanced PDF Quality Checker Service
@@ -126,6 +145,30 @@ const PLATFORM_PATTERNS = [
   'nptel',
 ];
 
+// Professor/instructor credit patterns
+const PROFESSOR_PATTERNS = [
+  /\b(?:prof(?:essor)?|dr)\.?\s+[a-z]+(?:\s+[a-z]+){0,2}\b/i,
+  /\b(?:lecture notes|notes)\s+by\s+(?:prof(?:essor)?|dr)\.?\s+[a-z]+(?:\s+[a-z]+){0,2}\b/i,
+  /\bprepared by\s+(?:prof(?:essor)?|dr)\.?\s+[a-z]+(?:\s+[a-z]+){0,2}\b/i,
+  /\b(?:course material|slides)\s+by\s+(?:prof(?:essor)?|dr)\.?\s+[a-z]+(?:\s+[a-z]+){0,2}\b/i,
+];
+
+// Book title / source indicators (high-confidence ownership cues)
+const BOOK_SOURCE_PATTERNS = [
+  /\b(?:chapter|ch\.)\s*\d+\s*[:\-]\s*[a-z0-9][a-z0-9\s,&'().-]{5,}/i,
+  /\b\d+(?:st|nd|rd|th)\s+edition\b/i,
+  /\b(?:revised|international)\s+edition\b/i,
+  /\bisbn(?:-1[03])?\s*[:\-]?\s*[0-9x\-]{10,20}\b/i,
+  /\bby\s+[a-z]+(?:\s+[a-z]+){1,3}\s*(?:press|publisher|edition)\b/i,
+];
+
+// Institution logo / emblem / seal indicators in extracted text
+const INSTITUTION_LOGO_PATTERNS = [
+  /\bofficial\s+(?:logo|emblem|seal|crest)\b/i,
+  /\b(?:logo|emblem|seal|crest)\s+of\s+[a-z0-9\s,&'().-]*(?:university|college|institute|school)\b/i,
+  /\b(?:university|college|institute)\s+(?:logo|emblem|seal|crest)\b/i,
+];
+
 /**
  * Load PDF buffer from file path or cloudinary
  */
@@ -142,7 +185,7 @@ const loadPDFBuffer = async (filePath) => {
 export const checkCopyright = async (pdfBuffer) => {
   try {
     const data = await parsePDF(pdfBuffer);
-    const text = data.text.toLowerCase();
+    const text = (data.text || '').toLowerCase();
 
     // Check for copyright keywords
     const foundKeywords = COPYRIGHT_KEYWORDS.filter(keyword =>
@@ -162,22 +205,68 @@ export const checkCopyright = async (pdfBuffer) => {
       text.includes(p.toLowerCase())
     );
 
+    // Check for professor/instructor name credits
+    const foundProfessorPatterns = PROFESSOR_PATTERNS.filter(re => re.test(text));
+
+    // Check for named book/textbook ownership indicators
+    const foundBookSources = BOOK_SOURCE_PATTERNS.filter(re => re.test(text));
+
+    // Check for institution logo/emblem text markers
+    const foundInstitutionLogo = INSTITUTION_LOGO_PATTERNS.filter(re => re.test(text));
+
     const hasCopyright = foundKeywords.length > 0;
     const hasPublisher = foundPublishers.length > 0;
     const hasUniversity = foundUniversity.length > 0;
     const hasPlatform = foundPlatforms.length > 0;
+    const hasProfessorName = foundProfessorPatterns.length > 0;
+    const hasInstitutionLogo = foundInstitutionLogo.length > 0;
+    const hasEditionMarker = /\b\d{1,2}(?:st|nd|rd|th)\s+ed(?:ition)?\b/i.test(text) || /\bedition\b/i.test(text);
+    const hasIsbnMarker = /\bisbn\b/i.test(text);
+    const hasBookContext =
+      /\b(?:textbook|book|author|chapter)\b/i.test(text) ||
+      /\bby\s+[a-z]+(?:\s+[a-z]+){1,3}\b/i.test(text);
+    const hasBookSource =
+      foundBookSources.length > 0 ||
+      (hasBookContext && (hasIsbnMarker || hasEditionMarker || hasPublisher)) ||
+      (hasIsbnMarker && (hasEditionMarker || hasPublisher));
 
-    const failed = hasCopyright || hasPublisher || hasUniversity || hasPlatform;
+    const failed =
+      hasCopyright ||
+      hasPublisher ||
+      hasUniversity ||
+      hasPlatform ||
+      hasProfessorName ||
+      hasInstitutionLogo ||
+      hasBookSource;
+
+    const reasonParts = [];
+    if (hasInstitutionLogo) reasonParts.push('institution logo/emblem markers');
+    if (hasUniversity) reasonParts.push('college/university name');
+    if (hasProfessorName) reasonParts.push('professor/instructor name');
+    if (hasBookSource) reasonParts.push('book/textbook source markers');
+    if (hasPublisher) reasonParts.push('publisher markers');
+    if (hasCopyright) reasonParts.push('copyright phrases');
+    if (hasPlatform) reasonParts.push('external platform watermark');
 
     return {
       passed: !failed,
+      failReason: failed ? `Detected ${reasonParts.slice(0, 3).join(', ')}` : null,
       hasCopyright,
       hasPublisher,
       hasUniversity,
       hasPlatform,
+      hasProfessorName,
+      hasBookSource,
+      hasInstitutionLogo,
+      hasBookContext,
+      hasEditionMarker,
+      hasIsbnMarker,
       foundKeywords: foundKeywords.slice(0, 3),
       foundPublishers: foundPublishers.slice(0, 2),
       foundPlatforms: foundPlatforms.slice(0, 2),
+      foundProfessorPatterns: foundProfessorPatterns.map(re => re.source).slice(0, 2),
+      foundBookSources: foundBookSources.map(re => re.source).slice(0, 2),
+      foundInstitutionLogo: foundInstitutionLogo.map(re => re.source).slice(0, 2),
       suspicionLevel: failed ? 'high' : 'low'
     };
   } catch (error) {

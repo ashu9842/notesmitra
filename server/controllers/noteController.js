@@ -198,9 +198,9 @@ export const uploadNote = async (req, res, next) => {
         // ── Step 2: Metadata check (rule-based, quick) ───────────────────────
         const metadataResult = await pdfQualityChecker.checkMetadata(pdfBuffer);
 
-        // ── Step 3: Gemini AI checks (blank pages, scan quality, copyright) ──
+        // ── Step 3: Groq AI checks (blank pages, scan quality, copyright) ──
         const aiChecks = await geminiQualityChecker.runGeminiChecks(pdfBuffer);
-        logger.info(`AI analysis: ${aiChecks.usedAI ? 'Gemini' : 'fallback rule-based'}`);
+        logger.info(`AI analysis: ${aiChecks.usedAI ? 'Groq' : 'fallback rule-based'}`);
 
         qualityCheckDetails = {
           success: true,

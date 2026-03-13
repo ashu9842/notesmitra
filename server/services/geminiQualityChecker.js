@@ -30,21 +30,32 @@ import {
 
 const require = createRequire(import.meta.url);
 const pdfParseLib = require('pdf-parse');
-const resolvePdfParser = () => {
-  if (typeof pdfParseLib === 'function') return pdfParseLib;
-  if (typeof pdfParseLib?.default === 'function') return pdfParseLib.default;
+const parsePDF = async (pdfBuffer) => {
+  if (typeof pdfParseLib === 'function') {
+    return pdfParseLib(pdfBuffer);
+  }
+
+  if (typeof pdfParseLib?.default === 'function') {
+    return pdfParseLib.default(pdfBuffer);
+  }
+
+  if (typeof pdfParseLib?.PDFParse === 'function') {
+    const parser = new pdfParseLib.PDFParse({ data: pdfBuffer });
+    try {
+      return await parser.getText();
+    } finally {
+      await parser.destroy().catch(() => undefined);
+    }
+  }
+
   throw new Error('pdf-parse parser function is unavailable');
-};
-const parsePDF = async (buf) => {
-  const parser = resolvePdfParser();
-  return parser(buf);
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 /**
  * Extract text from a PDF buffer using pdf-parse.
- * Returns up to `MAX_CHARS` characters to keep the Gemini prompt manageable.
+ * Returns up to `MAX_CHARS` characters to keep the Groq prompt manageable.
  */
 const MAX_CHARS = 12_000;
 
@@ -58,15 +69,15 @@ const extractText = async (pdfBuffer) => {
   };
 };
 
-// ─── Gemini AI analysis ──────────────────────────────────────────────────────
+// ─── Groq AI analysis ────────────────────────────────────────────────────────
 
 /**
- * Build and send the Gemini prompt; parse the structured JSON response.
+ * Build and send the Groq prompt; parse the structured JSON response.
  *
  * @param {string} extractedText   – Page text from pdf-parse
  * @param {number} pageCount       – Number of pages in the PDF
  * @param {number} totalChars      – Non-whitespace character count
- * @returns {{ blankPage, quality, copyright }}
+ * @returns {{ blankPage, quality, copyright, watermark, metadata }}
  */
 const analyseWithGroq = async (extractedText, pageCount, totalChars) => {
   const apiKey = config.groqApiKey;
@@ -148,17 +159,27 @@ Rules for each check:
       - Publisher names as document source (Pearson, McGraw-Hill, Wiley, Elsevier, Springer, Oxford University Press, Cambridge University Press, Cengage, Routledge, Taylor & Francis, Sage, MIT Press, Packt, O'Reilly, Apress)
       - Phrases: "all rights reserved", "© copyright", "no part of this publication may be reproduced", "unauthorized copying", "ISBN" combined with publisher name
 
-   B. University / institution branding:
+  B. University / institution branding:
       - A university or college name appearing as a document header/footer/watermark (e.g. "MIT OpenCourseWare", "Stanford University", "IIT", "NPTEL", "Harvard University", "NIT", "VTU", "Anna University", or any "University of ..." / "...Institute of Technology" pattern)
+    - Explicit institution logo/emblem/seal/crest markers in text (e.g. "official logo", "college emblem", "university seal")
       - Official lecture slide branding: "Department of ...", "School of ...", "Faculty of ...", "Course material © ..."
       - Professor/instructor credits: "Prepared by Prof.", "Lecture notes by Dr.", "© [Name], [University]"
       - Autonomous institution stamps: "(AUTONOMOUS)", "Affiliated to ...", "Accredited by NAAC/NBA/AICTE"
 
-   C. Education platform / website watermarks:
+  C. Professor / instructor identification:
+    - Any named professor/instructor in authoring context (e.g. "Prof. Rahul Sharma", "Dr. A. Kumar")
+    - Name + department/institute combinations that indicate official lecture material ownership
+
+  D. Book / textbook source material:
+    - Named book titles or chapter headers that indicate copied textbook content (e.g. "Engineering Mathematics by B.S. Grewal")
+    - Cover-like metadata signals: title + author + edition + ISBN/publisher combinations
+    - Phrases indicating textbook extraction such as "Chapter X" with publisher/author ownership context
+
+  E. Education platform / website watermarks:
       - Coursera, Udemy, edX, Khan Academy, BYJU'S, Unacademy, PW / Physics Wallah, Vedantu, Toppr, Testbook, Gradeup, NPTEL, MIT OCW branding anywhere in the text
       - Watermark phrases: "downloaded from", repeatedly appearing URLs (www., .com, .edu), "visit [site]", "courtesy of"
 
-   D. Official exam / board material:
+  F. Official exam / board material:
       - CBSE, ICSE, JEE, NEET, GATE, UPSC official question papers or mark schemes
       - "Board of ...", "Examination board", "Question paper"
 
@@ -242,7 +263,7 @@ Respond with the JSON object only.`;
       }
     }
   }
-  if (!raw) throw lastErr || new Error('All Gemini models failed or API key is invalid');
+  if (!raw) throw lastErr || new Error('All Groq models failed or API key is invalid');
 
   // Strip optional markdown code fences if the model includes them
   const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
@@ -258,17 +279,17 @@ Respond with the JSON object only.`;
       try {
         parsed = JSON.parse(candidate);
       } catch {
-        throw new Error(`Gemini returned non-JSON response: ${raw.slice(0, 200)}`);
+        throw new Error(`Groq returned non-JSON response: ${raw.slice(0, 200)}`);
       }
     } else {
-      throw new Error(`Gemini returned non-JSON response: ${raw.slice(0, 200)}`);
+      throw new Error(`Groq returned non-JSON response: ${raw.slice(0, 200)}`);
     }
   }
 
   // Validate shape — all 5 checks must be present
   for (const key of ['blankPage', 'quality', 'copyright', 'watermark', 'metadata']) {
     if (typeof parsed[key]?.passed !== 'boolean') {
-      throw new Error(`Gemini response missing or invalid field: ${key}`);
+      throw new Error(`Groq response missing or invalid field: ${key}`);
     }
   }
 
@@ -330,7 +351,8 @@ const runRuleBasedFallback = async (pdfBuffer, reason = 'unknown') => {
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
- * Run the three AI quality checks (blank page, scan quality, copyright) on
+ * Run all AI quality checks (blank page, scan quality, copyright, watermark,
+ * metadata) on
  * a PDF buffer.  Falls back to rule-based checks on any failure.
  *
  * @param {Buffer} pdfBuffer
@@ -394,7 +416,7 @@ export const runGeminiChecks = async (pdfBuffer) => {
       usedAI: true,
     };
   } catch (err) {
-    return runRuleBasedFallback(pdfBuffer, `Gemini analysis failed: ${err.message}`);
+    return runRuleBasedFallback(pdfBuffer, `Groq analysis failed: ${err.message}`);
   }
 };
 
