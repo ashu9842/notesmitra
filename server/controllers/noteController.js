@@ -1177,15 +1177,41 @@ export const getAISummary = async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'You must purchase this note to use AI features' });
     }
 
+    logger.debug('getAISummary: fetching PDF buffer', { noteId: note._id, storageType: note.storageType });
+    
     const pdfBuffer = await fetchNotePdfBuffer(note);
     if (!pdfBuffer) {
-      return res.status(404).json({ success: false, error: 'Could not load note file for AI analysis' });
+      logger.error('getAISummary: could not fetch PDF', { 
+        noteId: note._id,
+        storageType: note.storageType,
+        hasCloudinaryId: !!note.cloudinaryPublicId,
+        hasFilePath: !!note.filePath
+      });
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Could not load note file for AI analysis. Please ensure the file was uploaded successfully.' 
+      });
     }
 
+    logger.debug('getAISummary: calling summariseNote',  { bufferSize: pdfBuffer.length, noteTitle: note.title });
+    
     const result = await summariseNote(pdfBuffer, { title: note.title, subject: note.subject });
+    
+    logger.info('getAISummary: summary generated', {
+      noteId: note._id,
+      hasQuickRevision: !!result.quickRevision?.length,
+      quickRevisionCount: result.quickRevision?.length || 0,
+      keyTopicsCount: result.keyTopics?.length || 0,
+      summaryLength: result.summary?.length || 0
+    });
+    
     return res.json({ success: true, ...result });
   } catch (error) {
-    logger.error('getAISummary error', { error: error.message });
+    logger.error('getAISummary error', { 
+      error: error.message,
+      stack: error.stack?.split('\n').slice(0, 3),
+      noteId: req.params.id
+    });
     next(error);
   }
 };

@@ -5,6 +5,134 @@ import logger from '../utils/logger.js';
 const router = express.Router();
 
 /**
+ * Comprehensive test of the full summary pipeline with detailed diagnostics
+ * POST /diagnostic/test-summary-pipeline
+ * Body: { text: "sample text", title: "...", subject: "..." }
+ */
+router.post('/test-summary-pipeline', async (req, res) => {
+  try {
+    const { text = 'Photosynthesis is the process by which plants convert light energy into chemical energy...',  title = 'Biology Notes',  subject = 'Biology' } = req.body;
+
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      input: { textLength: text.length, title, subject },
+      steps: []
+    };
+
+    logger.info('test-summary-pipeline: starting', diagnostics.input);
+
+    // Step 1: Verify Groq API key
+    const apiKey = config.groqApiKey;
+    diagnostics.steps.push({
+      step: '1. API Key Check',
+      status: apiKey ? 'OK' : 'FAIL',
+      apiKeyLength: apiKey?.length || 0,
+      apiKeyExists: !!apiKey
+    });
+
+    if (!apiKey) {
+      return res.status(500).json({ ...diagnostics, error: 'GROQ_API_KEY not configured' });
+    }
+
+    // Step 2: Test Groq SDK import
+    let Groq;
+    try {
+      const mod = await import('groq-sdk');
+      Groq = mod.default || mod;
+      diagnostics.steps.push({ step: '2. Groq SDK Import', status: 'OK' });
+    } catch (err) {
+      diagnostics.steps.push({ step: '2. Groq SDK Import', status: 'FAIL', error: err.message });
+      return res.status(500).json({ ...diagnostics, error: 'Failed to import Groq SDK' });
+    }
+
+    // Step 3: Create Groq client
+    const groq = new Groq({ apiKey });
+    diagnostics.steps.push({ step: '3. Groq Client Creation', status: 'OK' });
+
+    // Step 4: Call Groq API
+    const modelName = 'llama-3.1-8b-instant';
+    const testPrompt = `You are a study assistant. Respond with ONLY a JSON object (no markdown):
+{
+  "summary": "Brief summary",
+  "keyTopics": ["topic1", "topic2"],
+  "quickRevision": ["point1", "point2", "point3"]
+}`;
+
+    let groqResponse;
+    try {
+      groqResponse = await groq.chat.completions.create({
+        model: modelName,
+        messages: [{ role: 'user', content: testPrompt }],
+        temperature: 0.7,
+        max_tokens: 500,
+        top_p: 1
+      });
+      diagnostics.steps.push({
+        step: `4. Groq API Call (${modelName})`,
+        status: 'OK',
+        responseLength: groqResponse?.choices?.[0]?.message?.content?.length || 0
+      });
+    } catch (err) {
+      diagnostics.steps.push({
+        step: `4. Groq API Call (${modelName})`,
+        status: 'FAIL',
+        error: err.message
+      });
+      return res.status(500).json({ ...diagnostics, error: `Groq API failed: ${err.message}` });
+    }
+
+    const rawResponse = groqResponse?.choices?.[0]?.message?.content || '';
+    diagnostics.steps.push({
+      step: '5. Response Extraction',
+      status: rawResponse ? 'OK' : 'FAIL',
+      responseLength: rawResponse.length,
+      responsePreview: rawResponse.substring(0, 100)
+    });
+
+    if (!rawResponse) {
+      return res.status(500).json({ ...diagnostics, error: 'Empty response from Groq' });
+    }
+
+    // Step 6: Parse JSON
+    let parsed;
+    try {
+      const firstBrace = rawResponse.indexOf('{');
+      const lastBrace = rawResponse.lastIndexOf('}');
+      const jsonStr = firstBrace >= 0 && lastBrace > firstBrace ? rawResponse.slice(firstBrace, lastBrace + 1) : rawResponse;
+      parsed = JSON.parse(jsonStr);
+      diagnostics.steps.push({
+        step: '6. JSON Parsing',
+        status: 'OK',
+        keys: Object.keys(parsed)
+      });
+    } catch (err) {
+      diagnostics.steps.push({
+        step: '6. JSON Parsing',
+        status: 'FAIL',
+        error: err.message,
+        rawResponsePreview: rawResponse.substring(0, 200)
+      });
+      return res.status(500).json({ ...diagnostics, error: `JSON parse failed: ${err.message}` });
+    }
+
+    diagnostics.result = {
+      status: 'SUCCESS',
+      summary: parsed.summary?.substring(0, 100),
+      keyTopicsCount: Array.isArray(parsed.keyTopics) ? parsed.keyTopics.length : 0,
+      quickRevisionCount: Array.isArray(parsed.quickRevision) ? parsed.quickRevision.length : 0
+    };
+
+    return res.json(diagnostics);
+  } catch (err) {
+    logger.error('test-summary-pipeline error:', err.message);
+    return res.status(500).json({
+      error: err.message,
+      stack: err.stack?.split('\n').slice(0, 3)
+    });
+  }
+});
+
+/**
  * Test raw Groq response (no JSON parsing)
  * POST /diagnostic/test-raw-groq
  */
