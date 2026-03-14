@@ -44,8 +44,8 @@ const getSellerWithdrawableBalance = async ({ userId, wallet }) => {
 // @access  Private
 export const getWallet = async (req, res, next) => {
   try {
-    // Get user with tenantId
-    const user = await User.findById(req.user._id).select('tenantId role');
+    // Get user with tenantId and earnings info
+    const user = await User.findById(req.user._id).select('tenantId role totalEarnings walletBalance totalSpent');
     if (!user?.tenantId) {
       return res.status(400).json({
         success: false,
@@ -70,9 +70,22 @@ export const getWallet = async (req, res, next) => {
     await wallet.updateAvailableBalance();
     await wallet.save();
 
+    // Return wallet stats + user earnings separately
+    // This ensures totalEarnings is NOT confused with availableBalance
     res.status(200).json({
       success: true,
-      wallet,
+      wallet: {
+        balance: wallet.balance,
+        availableBalance: wallet.availableBalance,
+        totalWithdrawn: wallet.totalWithdrawn,
+        totalPendingWithdrawals: wallet.totalPendingWithdrawals,
+        transactions: wallet.transactions
+      },
+      userEarnings: {
+        totalEarnings: user.totalEarnings || 0,  // Lifetime earnings from sales (NOT affected by withdrawals)
+        currentBalance: user.walletBalance || 0,  // Current wallet balance
+        totalSpent: user.totalSpent || 0
+      },
       withdrawableBalance: wallet.availableBalance
     });
   } catch (error) {
@@ -208,17 +221,26 @@ export const withdrawFunds = async (req, res, next) => {
     await wallet.updateAvailableBalance();
     await wallet.save();
 
-    // Update user wallet balance (note: totalEarnings is NOT decreased, only balance)
-    // totalEarnings represents lifetime earnings, not current available amount
-    await User.findByIdAndUpdate(req.user._id, { 
+    // Update user wallet balance ONLY (NOT totalEarnings)
+    // totalEarnings represents lifetime earnings from sales, should NEVER decrease
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, { 
       walletBalance: wallet.balance
-      // totalEarnings is NOT updated here - it remains as lifetime earnings
-      // Only balance is deducted for pending withdrawal
-    });
+    }, { new: true }).select('totalEarnings walletBalance totalSpent');
 
     res.status(200).json({
       success: true,
-      wallet,
+      wallet: {
+        balance: wallet.balance,
+        availableBalance: wallet.availableBalance,
+        totalWithdrawn: wallet.totalWithdrawn,
+        totalPendingWithdrawals: wallet.totalPendingWithdrawals,
+        transactions: wallet.transactions
+      },
+      userEarnings: {
+        totalEarnings: updatedUser.totalEarnings || 0,  // UNCHANGED on withdrawal
+        currentBalance: updatedUser.walletBalance || 0,  // DECREASED by withdrawal amount
+        totalSpent: updatedUser.totalSpent || 0
+      },
       transaction,
       message: 'Withdrawal request submitted. Admin will send payment to your UPI within 1–2 business days.',
     });
@@ -288,19 +310,27 @@ export const completeWithdrawal = async (req, res, next) => {
     await wallet.updateAvailableBalance();
     await wallet.save();
 
+    // Get updated user - confirm totalEarnings was NOT changed
+    const updatedUser = await User.findById(wallet.userId).select('totalEarnings walletBalance totalSpent');
+
     // Note: DO NOT update totalEarnings - it represents lifetime earnings
     // totalEarnings should only increase on actual sale, not on withdrawal
     // The completed withdrawal is tracked in wallet.totalWithdrawn via updateAvailableBalance()
     
-    // Optionally log the completed withdrawal for audit trail
-    await User.findByIdAndUpdate(wallet.userId, { 
-      // walletBalance remains as is (already deducted when pending)
-      // totalEarnings remains as is (withdrawal doesn't affect earnings)
-    });
-
     res.status(200).json({ 
-      success: true, 
+      success: true,
       message: 'Withdrawal marked as completed',
+      wallet: {
+        balance: wallet.balance,
+        availableBalance: wallet.availableBalance,
+        totalWithdrawn: wallet.totalWithdrawn,
+        totalPendingWithdrawals: wallet.totalPendingWithdrawals
+      },
+      userEarnings: {
+        totalEarnings: updatedUser.totalEarnings || 0,  // UNCHANGED on withdrawal completion
+        currentBalance: updatedUser.walletBalance || 0,
+        totalSpent: updatedUser.totalSpent || 0
+      },
       withdrawnAmount: completedAmount
     });
   } catch (error) {
