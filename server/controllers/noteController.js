@@ -157,12 +157,13 @@ export const uploadNote = async (req, res, next) => {
       qualityCheck: true,
       metadataCheck: true
     };
+    let advancedChecksExecuted = false;
     
     let qualityCheckDetails = null;
     let qualityWarnings = [];
 
-    // Get PDF buffer from local file or Cloudinary
-    let pdfBuffer = null;
+    // Get PDF buffer from request cache, local file, or Cloudinary
+    let pdfBuffer = Buffer.isBuffer(req.uploadedPdfBuffer) ? req.uploadedPdfBuffer : null;
     if (filePath && fs.existsSync(filePath)) {
       pdfBuffer = fs.readFileSync(filePath);
     } else if (useCloudinary && req.cloudinaryFile?.publicId) {
@@ -220,6 +221,7 @@ export const uploadNote = async (req, res, next) => {
           qualityCheck:   aiChecks.quality.passed,
           metadataCheck:  aiChecks.metadata.passed,
         };
+        advancedChecksExecuted = true;
 
         if (!aiChecks.copyright.passed)  qualityWarnings.push(aiChecks.copyright.warning  || 'Copyrighted material detected');
         if (!aiChecks.blankPages.passed) qualityWarnings.push(aiChecks.blankPages.warning || 'Blank or empty pages detected');
@@ -238,6 +240,53 @@ export const uploadNote = async (req, res, next) => {
       } catch (error) {
         logger.error('Advanced quality check failed', { error: error.message });
       }
+    }
+
+    // Fail-safe: if mandatory PDF quality analysis could not run, reject upload.
+    if (!advancedChecksExecuted) {
+      const analysisFailReason = 'Mandatory PDF quality analysis could not be completed';
+
+      advancedChecks = {
+        copyrightCheck: false,
+        blankPageCheck: false,
+        qualityCheck: false,
+        metadataCheck: false,
+      };
+
+      qualityWarnings.push(analysisFailReason);
+      qualityCheckDetails = qualityCheckDetails || {
+        success: false,
+        usedAI: false,
+        error: analysisFailReason,
+        checks: {
+          copyright: {
+            passed: false,
+            failReason: analysisFailReason,
+            warning: analysisFailReason,
+          },
+          blankPages: {
+            passed: false,
+            failReason: analysisFailReason,
+            warning: analysisFailReason,
+          },
+          quality: {
+            passed: false,
+            failReason: analysisFailReason,
+            warning: analysisFailReason,
+          },
+          metadata: {
+            passed: false,
+            failReason: analysisFailReason,
+            warning: analysisFailReason,
+          },
+        },
+      };
+
+      logger.warn('Rejecting upload because PDF quality analysis was not executed', {
+        title,
+        subject,
+        useCloudinary,
+      });
     }
 
     // Combine all quality checks (including duplicate)

@@ -166,6 +166,14 @@ export const uploadToCloud = async (req, res, next) => {
       folderPath: cloudResult.folderPath
     };
 
+    // Preserve file bytes for immediate quality checks in the controller.
+    // This avoids dependency on Cloudinary re-download availability.
+    try {
+      req.uploadedPdfBuffer = fs.readFileSync(req.file.path);
+    } catch (bufferError) {
+      logger.warn('Could not cache uploaded PDF buffer for quality checks', { error: bufferError.message });
+    }
+
     // Delete temp local file
     if (fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
