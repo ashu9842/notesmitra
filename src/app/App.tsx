@@ -317,6 +317,7 @@ export default function App() {
   const [purchasedNotes, setPurchasedNotes] = useState<string[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletWithdrawableBalance, setWalletWithdrawableBalance] = useState<number | null>(null);
+  const [walletTotalEarnings, setWalletTotalEarnings] = useState<number | null>(null);
   const [adminWalletBalance, setAdminWalletBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
@@ -416,9 +417,13 @@ export default function App() {
         // Listen for admin stats updates
         socketClient.on('admin:stats:update', (stats: any) => {
           if (stats) {
-            setAdminStats(stats);
-            const platformBal = Number(stats.platformWalletBalance ?? stats.totalRevenue ?? 0);
-            setAdminWalletBalance(platformBal);
+            setAdminStats((prev: any) => ({ ...(prev || {}), ...stats }));
+            if (stats.platformWalletBalance !== undefined && stats.platformWalletBalance !== null) {
+              const platformBal = Number(stats.platformWalletBalance);
+              if (Number.isFinite(platformBal)) {
+                setAdminWalletBalance(platformBal);
+              }
+            }
           }
         });
       })
@@ -603,11 +608,14 @@ export default function App() {
       setWalletBalance(balance);
       const available = Number(data.withdrawableBalance ?? balance);
       setWalletWithdrawableBalance(Number.isFinite(available) ? available : balance);
+      const earnings = Number(data.userEarnings?.totalEarnings);
+      setWalletTotalEarnings(Number.isFinite(earnings) ? earnings : null);
       if (currentUser?.role === "admin") {
         setAdminWalletBalance(balance);
       }
     } catch (error: any) {
       setWalletWithdrawableBalance(null);
+      setWalletTotalEarnings(null);
       if (currentUser) {
         const raw = error.message || "Failed to load wallet";
         const message = raw === '__SERVER_STARTING__' ? 'Server is starting up. Please refresh in a moment.' : raw;
@@ -764,6 +772,7 @@ export default function App() {
     if (!currentUser) {
       setWalletBalance(0);
       setWalletWithdrawableBalance(null);
+      setWalletTotalEarnings(null);
       setTransactions([]);
       setPurchasedNotes([]);
       setSupportTickets([]);
@@ -1933,7 +1942,7 @@ export default function App() {
                     onRefresh={loadTransactions}
                     isLoading={isLoadingWallet}
                     errorMessage={walletError}
-                    totalEarningsOverride={sellerStats.totalEarnings}
+                    totalEarningsOverride={walletTotalEarnings ?? sellerStats.totalEarnings}
                     availableBalanceOverride={walletWithdrawableBalance ?? walletBalance}
                   />
                 </TabsContent>
@@ -2219,7 +2228,7 @@ export default function App() {
                     isAdmin={true}
                     isLoading={isLoadingAdminStats}
                     errorMessage={adminStatsError}
-                    totalEarningsOverride={Number(adminStats?.platformWalletBalance ?? adminStats?.totalRevenue ?? 0)}
+                    totalEarningsOverride={Number(adminStats?.platformTotalEarnings ?? adminStats?.totalPlatformEarnings ?? adminStats?.totalRevenue ?? 0)}
                   />
                 </TabsContent>
 

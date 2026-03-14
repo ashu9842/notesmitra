@@ -173,12 +173,18 @@ export const getStats = async (req, res, next) => {
     // Get actual platform wallet balance and full transaction history
     let platformWalletBalance = 0;
     let platformWalletTransactions = [];
+    let platformTotalEarnings = Number(totalRevenue || 0);
     if (config.platformUserId) {
       const platformWallet = await Wallet.findOne({ userId: config.platformUserId }).select('balance transactions').lean();
       platformWalletBalance = platformWallet?.balance || 0;
 
       // Resolve user IDs in subscription descriptions -> names
       const rawTxns = platformWallet?.transactions || [];
+      platformTotalEarnings = rawTxns.reduce((sum, txn) => {
+        const isCompletedCredit = txn.type === 'credit' && (txn.status || 'completed') === 'completed';
+        return isCompletedCredit ? sum + Number(txn.amount || 0) : sum;
+      }, 0);
+
       const userIdRegex = /User:\s*([a-f0-9]{24})/gi;
       const userIdSet = new Set();
       for (const t of rawTxns) {
@@ -233,6 +239,7 @@ export const getStats = async (req, res, next) => {
         totalPurchases,
         totalRevenue: totalRevenue.toFixed(2),
         platformWalletBalance: platformWalletBalance.toFixed(2),
+        platformTotalEarnings: Number(platformTotalEarnings || 0).toFixed(2),
         platformWalletTransactions,
         openTickets,
         totalTickets,

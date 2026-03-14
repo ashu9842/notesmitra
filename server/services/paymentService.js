@@ -213,6 +213,7 @@ export const emitAdminStatsUpdate = async () => {
       totalNotes,
       totalPurchases,
       totalPlatformEarnings,
+      platformTotalEarnings: totalPlatformEarnings,
       notesByStatus: notesByStatus.reduce((acc, item) => {
         acc[item._id] = item.count;
         return acc;
