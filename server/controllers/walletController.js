@@ -114,8 +114,8 @@ export const addFunds = async (req, res, next) => {
       });
     }
 
-    // Get wallet
-    const user = await User.findById(req.user._id).select('tenantId');
+    // Get wallet and user earnings info
+    const user = await User.findById(req.user._id).select('tenantId totalEarnings walletBalance totalSpent');
     if (!user?.tenantId) {
       return res.status(400).json({
         success: false,
@@ -154,14 +154,25 @@ export const addFunds = async (req, res, next) => {
     await wallet.updateAvailableBalance();
     await wallet.save();
 
-    // Update user wallet balance
-    await User.findByIdAndUpdate(req.user._id, {
+    // Update user wallet balance and wallet balance
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, {
       walletBalance: wallet.balance
-    });
+    }, { new: true }).select('totalEarnings walletBalance totalSpent');
 
     res.status(200).json({
       success: true,
-      wallet,
+      wallet: {
+        balance: wallet.balance,
+        availableBalance: wallet.availableBalance,
+        totalWithdrawn: wallet.totalWithdrawn,
+        totalPendingWithdrawals: wallet.totalPendingWithdrawals,
+        transactions: wallet.transactions
+      },
+      userEarnings: {
+        totalEarnings: updatedUser.totalEarnings || 0,
+        currentBalance: updatedUser.walletBalance || 0,
+        totalSpent: updatedUser.totalSpent || 0
+      },
       transaction
     });
   } catch (error) {
