@@ -2382,7 +2382,7 @@ export default function App() {
                       <CardContent className="pt-6">
                         <p className="text-xs text-muted-foreground">Total Revenue</p>
                         <p className="text-2xl font-bold">
-                          {isLoadingAdminStats ? "..." : `₹${Number(adminStats?.platformWalletBalance ?? adminStats?.totalRevenue ?? 0).toFixed(2)}`}
+                          {isLoadingAdminStats ? "..." : `₹${Number(adminStats?.platformTotalEarnings ?? adminStats?.totalPlatformEarnings ?? adminStats?.totalRevenue ?? 0).toFixed(2)}`}
                         </p>
                       </CardContent>
                     </Card>
