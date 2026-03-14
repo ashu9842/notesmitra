@@ -245,7 +245,7 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
             </section>
 
             <div className="rounded-xl bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 px-4 py-3 text-xs text-muted-foreground">
-              Last updated: March 9, 2026. By using this platform, you agree to these terms and conditions.
+              Last updated: March 15, 2026. By using this platform, you agree to these terms and conditions.
             </div>
 
           </div>
