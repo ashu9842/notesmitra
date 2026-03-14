@@ -645,12 +645,14 @@ export default function App() {
     try {
       const data = await paymentAPI.getPurchases();
       const purchases = data.purchases || [];
+      // Only count unique, completed purchases
       const completedPurchases = purchases.filter((purchase: any) => purchase.status === 'completed');
       const completedNoteIds = completedPurchases.map((purchase: any) => purchase.noteId?._id || purchase.noteId);
-      setPurchasedNotes(prev => Array.from(new Set([...prev, ...completedNoteIds])));
+      const uniqueCompletedNoteIds = Array.from(new Set(completedNoteIds));
+      setPurchasedNotes(prev => Array.from(new Set([...prev, ...uniqueCompletedNoteIds])));
 
       const totalSpent = purchases.reduce((sum: number, purchase: any) => sum + Number(purchase.amount || 0), 0);
-      setBuyerStats({ totalPurchases: purchases.length, totalSpent });
+      setBuyerStats({ totalPurchases: uniqueCompletedNoteIds.length, totalSpent });
     } catch (error: any) {
       if (currentUser) {
         setAnalyticsError(formatClientErrorMessage(error, "Failed to load buyer analytics"));
