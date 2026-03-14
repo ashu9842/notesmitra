@@ -251,6 +251,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
   if (typeof note.price !== 'number' || isNaN(note.price) || note.price <= 0) {
     throw createError('Invalid note price. Please contact support.', 400);
   }
+  if (!note.tenantId) {
+    throw createError('Note is missing tenant information. Please contact support.', 400);
+  }
 
   const existingPurchase = await Purchase.findOne({
     buyerId: userId,
@@ -278,6 +281,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
   } = pricing;
   if (typeof totalAmount !== 'number' || isNaN(totalAmount) || totalAmount <= 0) {
     throw createError('Invalid purchase amount. Please contact support.', 400);
+  }
+  if (typeof sellerEarnings !== 'number' || isNaN(sellerEarnings) || sellerEarnings < 0) {
+    throw createError('Invalid seller earnings. Please contact support.', 400);
   }
 
   if (paymentMethod === 'wallet') {
@@ -325,6 +331,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
       let sellerWallet = await Wallet.findOne({ userId: note.sellerId }).session(session);
 
       if (!sellerWallet) {
+        if (!note.sellerId || !note.tenantId) {
+          throw createError('Cannot create seller wallet: missing seller or tenant information.', 400);
+        }
         sellerWallet = await Wallet.create([
           {
             userId: note.sellerId,
