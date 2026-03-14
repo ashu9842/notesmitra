@@ -142,13 +142,18 @@ export const uploadNote = async (req, res, next) => {
     };
 
     // Duplicate detection — same title + subject in this tenant already approved/pending
-    const existingDuplicate = await Note.findOne({
+    const titleSubjectDuplicate = await Note.findOne({
       tenantId: req.user.tenantId,
       title: { $regex: new RegExp(`^${escapeRegex(title)}$`, 'i') },
       subject: { $regex: new RegExp(`^${escapeRegex(subject)}$`, 'i') },
       status: { $in: ['pending_review', 'approved'] }
     }).lean();
-    const isDuplicate = !!existingDuplicate;
+    let isDuplicate = !!titleSubjectDuplicate;
+    let duplicateReason = isDuplicate
+      ? 'Same title and subject already exist in this tenant'
+      : null;
+    let contentHash = null;
+    let textHash = null;
 
     // Run advanced PDF quality checks — works for both local and Cloudinary storage
     let advancedChecks = {
@@ -208,6 +213,34 @@ export const uploadNote = async (req, res, next) => {
           });
         }
 
+        // ── Step 1.5: Content fingerprint duplicate-check (hash-based) ─────────
+        const fingerprints = await pdfQualityChecker.computePdfFingerprints(pdfBuffer);
+        contentHash = fingerprints.contentHash;
+        textHash = fingerprints.textHash;
+
+        if (!isDuplicate) {
+          const duplicateHashConditions = [];
+          if (contentHash) duplicateHashConditions.push({ contentHash });
+          if (textHash) duplicateHashConditions.push({ textHash });
+
+          if (duplicateHashConditions.length > 0) {
+            const hashDuplicate = await Note.findOne({
+              status: { $in: ['pending_review', 'approved'] },
+              $or: duplicateHashConditions,
+            })
+              .select('_id title tenantId')
+              .lean();
+
+            if (hashDuplicate) {
+              isDuplicate = true;
+              duplicateReason =
+                String(hashDuplicate.tenantId) === String(req.user.tenantId)
+                  ? 'Same PDF content already exists in this tenant'
+                  : 'Same PDF content already exists in the platform';
+            }
+          }
+        }
+
         // ── Step 2: Metadata check (rule-based, quick) ───────────────────────
         const metadataResult = await pdfQualityChecker.checkMetadata(pdfBuffer);
 
@@ -251,6 +284,7 @@ export const uploadNote = async (req, res, next) => {
           quality:    advancedChecks.qualityCheck    ? 'pass' : 'fail',
           metadata:   advancedChecks.metadataCheck   ? 'pass' : 'fail',
           duplicate:  isDuplicate ? 'fail' : 'pass',
+          duplicateReason,
           warnings:   qualityWarnings.length,
         });
       } catch (error) {
@@ -358,7 +392,7 @@ export const uploadNote = async (req, res, next) => {
         key: 'duplicateCheck',
         label: 'Duplicate Detection',
         passed: !isDuplicate,
-        failReason: isDuplicate ? 'Similar notes already exist in the system' : null
+        failReason: isDuplicate ? (duplicateReason || 'Similar notes already exist in the system') : null
       },
     ];
     
@@ -412,6 +446,8 @@ export const uploadNote = async (req, res, next) => {
       fileSize,
       status: uploadStatus,
       qualityChecks,
+      contentHash,
+      textHash,
       uploadedAt: new Date(),
       // Premium features
       isPriorityApproval: isPremiumSeller,

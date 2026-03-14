@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { PDFDocument } from 'pdf-lib';
 import { createRequire } from 'module';
 import logger from '../utils/logger.js';
@@ -177,6 +178,49 @@ const loadPDFBuffer = async (filePath) => {
     throw new Error('PDF file not found');
   }
   return fs.readFileSync(filePath);
+};
+
+/**
+ * Compute stable PDF fingerprints for duplicate detection.
+ * - contentHash: SHA-256 of raw PDF bytes (strict exact duplicate)
+ * - textHash: SHA-256 of normalized extracted text (near-duplicate content)
+ */
+export const computePdfFingerprints = async (pdfBuffer) => {
+  const contentHash = crypto.createHash('sha256').update(pdfBuffer).digest('hex');
+
+  try {
+    const data = await parsePDF(pdfBuffer);
+    const rawText = String(data?.text || '');
+    const normalizedText = rawText
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const textHash = normalizedText
+      ? crypto.createHash('sha256').update(normalizedText).digest('hex')
+      : null;
+
+    return {
+      contentHash,
+      textHash,
+      pageCount: data?.numpages || 0,
+      textLength: rawText.length,
+      normalizedTextLength: normalizedText.length,
+    };
+  } catch (error) {
+    logger.warn('Fingerprint text extraction failed; using binary hash only', {
+      error: error.message,
+    });
+
+    return {
+      contentHash,
+      textHash: null,
+      pageCount: 0,
+      textLength: 0,
+      normalizedTextLength: 0,
+    };
+  }
 };
 
 /**
@@ -534,6 +578,7 @@ export default {
   checkQuality,
   checkMetadata,
   checkNotesMitraWatermark,
+  computePdfFingerprints,
   runAllQualityChecksFromBuffer,
   runAllQualityChecks
 };

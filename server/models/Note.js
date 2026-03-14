@@ -73,6 +73,21 @@ const noteSchema = new mongoose.Schema({
     enum: ['local', 'cloudinary'],
     default: 'local'
   },
+  // Duplicate-prevention fingerprints
+  contentHash: {
+    type: String,
+    required: false,
+    trim: true,
+    index: true,
+    sparse: true
+  },
+  textHash: {
+    type: String,
+    required: false,
+    trim: true,
+    index: true,
+    sparse: true
+  },
   status: {
     type: String,
     enum: ['pending_review', 'approved', 'rejected', 'failed_quality_check'],
@@ -164,6 +179,8 @@ noteSchema.index({ subject: 1 });
 noteSchema.index({ semester: 1 });
 noteSchema.index({ title: 'text', description: 'text' });
 noteSchema.index({ createdAt: -1 });
+noteSchema.index({ contentHash: 1, status: 1 });
+noteSchema.index({ textHash: 1, status: 1 });
 
 // Apply tenant plugin
 noteSchema.plugin(tenantPlugin);
