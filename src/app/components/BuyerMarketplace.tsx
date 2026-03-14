@@ -632,7 +632,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
       </div>
 
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {paymentStep === "confirm" && "Confirm Purchase"}
@@ -645,34 +645,34 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
               {paymentStep === "success" && "Your notes have been purchased successfully"}
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedNote && (
             <div className="space-y-4">
               {paymentStep === "confirm" && (
                 <>
-                  <div className="space-y-2">
-                    <h4>{selectedNote.title}</h4>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                    <h4 className="text-base font-semibold leading-snug break-words">{selectedNote.title}</h4>
+                    <p className="text-sm text-muted-foreground break-words">
                       {selectedNote.subject} • {selectedNote.course}
                     </p>
                   </div>
-                  
-                  <div className="border rounded p-4 space-y-2">
-                    <div className="flex justify-between text-sm">
+
+                  <div className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-3 text-sm">
                       <span className="text-muted-foreground">Note Price:</span>
-                      <span>₹{selectedNote.price.toFixed(2)}</span>
+                      <span className="shrink-0">₹{selectedNote.price.toFixed(2)}</span>
                     </div>
-                    <div className={`flex justify-between text-sm ${buyerPremium?.active ? 'text-green-600' : 'text-muted-foreground'}`}>
-                      <span>{buyerPremium?.active ? 'Transaction Fee (0% — Premium! 🎉)' : 'Transaction Fee (2%):'}</span>
-                      <span>{buyerPremium?.active ? '₹0.00' : `₹${(selectedNote.price * 0.02).toFixed(2)}`}</span>
+                    <div className={`flex items-start justify-between gap-3 text-sm ${buyerPremium?.active ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      <span className="min-w-0 break-words">{buyerPremium?.active ? 'Transaction Fee (0% — Premium! 🎉)' : 'Transaction Fee (2%):'}</span>
+                      <span className="shrink-0">{buyerPremium?.active ? '₹0.00' : `₹${(selectedNote.price * 0.02).toFixed(2)}`}</span>
                     </div>
                     {buyerPremium?.active && (
-                      <div className="flex justify-between text-green-600 text-sm">
+                      <div className="flex items-start justify-between gap-3 text-green-600 text-sm">
                         <span>Exclusive Discount:</span>
-                        <span>5–10% applied at checkout</span>
+                        <span className="text-right">5–10% applied at checkout</span>
                       </div>
                     )}
-                    <div className="border-t pt-2 flex justify-between font-semibold">
+                    <div className="border-t pt-2 flex items-start justify-between gap-3 font-semibold">
                       <span>Total:</span>
                       <span className="flex items-baseline gap-1">
                         {buyerPremium?.active ? (
@@ -687,15 +687,14 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
                       </span>
                     </div>
                     {buyerPremium?.active && (
-                      <div className="text-xs text-green-600 bg-green-50 dark:bg-green-950/30 rounded px-2 py-1 flex items-center gap-1 mt-1">
-                        <Crown className="w-3 h-3" />
-                        <span>Premium: Zero gateway fee + exclusive discount applied!</span>
+                      <div className="text-xs text-green-600 bg-green-50 dark:bg-green-950/30 rounded px-2 py-1 flex items-start gap-1 mt-1">
+                        <Crown className="w-3 h-3 mt-0.5 shrink-0" />
+                        <span className="leading-relaxed break-words">Premium: Zero gateway fee + exclusive discount applied!</span>
                       </div>
                     )}
                   </div>
 
-                  {/* Mobile number for Razorpay prefill */}
-                  <div className="border rounded p-3 space-y-1">
+                  <div className="border rounded-lg p-3 space-y-1">
                     <label className="text-sm font-medium">Mobile Number</label>
                     <Input
                       type="tel"
@@ -707,8 +706,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
                     <p className="text-xs text-muted-foreground">Pre-filled in the payment form. Saved for future purchases.</p>
                   </div>
 
-                  {/* Wallet payment */}
-                  <div className="border rounded p-3 space-y-2">
+                  <div className="border rounded-lg p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">Wallet Balance</span>
                       <span className={`text-sm font-semibold ${walletBalance >= (buyerPremium?.active ? selectedNote.price : selectedNote.price * 1.02) ? 'text-green-600' : 'text-red-500'}`}>
@@ -729,8 +727,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
                     )}
                   </div>
 
-                  {/* Razorpay payment */}
-                  <div className="border rounded p-3 space-y-2">
+                  <div className="border rounded-lg p-3 space-y-2">
                     <p className="text-sm font-medium">Pay with Card / UPI / Net Banking</p>
                     <Button onClick={handleRazorpayPayment} variant="outline" className="w-full">
                       Proceed to Payment
