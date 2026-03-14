@@ -76,18 +76,9 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                     <div className="rounded-xl border border-amber-100 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-950/20 p-3">
                       <p className="font-medium text-foreground mb-1.5">Payment Gateway Fee</p>
                       <BulletList items={[
-                        return (
-                          <Dialog open={isOpen} onOpenChange={onClose}>
-                            <DialogContent className="sm:max-w-2xl max-h-[85vh] p-0 overflow-hidden">
-                              <div className="px-6 pt-6 pb-4 border-b border-border bg-gradient-to-r from-indigo-50/60 via-violet-50/40 to-transparent dark:from-indigo-950/40 dark:via-violet-950/20 dark:to-transparent">
-                                <DialogHeader>
-                                  <DialogTitle className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">
-                                    Terms & Conditions
-                                  </DialogTitle>
-                                  <DialogDescription className="text-sm text-muted-foreground">
-                                    Please read these terms carefully before using NotesMitra.
-                                  </DialogDescription>
-                                </DialogHeader>
+                        "1.8% + ₹3 per transaction (charged to seller)",
+                        "Covers payment gateway processing, settlement, and refund handling"
+                      ]} />
                               </div>
                               <ScrollArea className="h-[calc(85vh-100px)] px-6 py-5">
                                 <div className="space-y-7 pb-4 text-sm">
