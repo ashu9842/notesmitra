@@ -672,18 +672,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
                       <span className="min-w-0 break-words">{buyerPremium?.active ? 'Transaction Fee (0% — Premium! 🎉)' : 'Transaction Fee (2%):'}</span>
                       <span className="shrink-0">{buyerPremium?.active ? '₹0.00' : `₹${(selectedNote.price * 0.02).toFixed(2)}`}</span>
                     </div>
-                    <div className="flex items-start justify-between gap-3 text-sm text-blue-700">
-                      <span>Seller Earnings (80% of original):</span>
-                      <span>₹{(selectedNote.price * 0.8).toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-start justify-between gap-3 text-sm text-purple-700">
-                      <span>Platform Commission:</span>
-                      <span>
-                        {buyerPremium?.active
-                          ? `₹${((selectedNote.price * 0.95) * 0.18).toFixed(2)} (18% of discounted)`
-                          : `₹${(selectedNote.price * 0.18).toFixed(2)} (18% of original)`}
-                      </span>
-                    </div>
+                    {/* Seller earnings and platform commission are not shown to buyers */}
                     <div className="border-t pt-2 flex items-start justify-between gap-3 font-semibold">
                       <span>Total to Pay:</span>
                       <span className="flex items-baseline gap-1">

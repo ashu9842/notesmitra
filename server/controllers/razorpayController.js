@@ -305,20 +305,29 @@ export const createNoteOrder = async (req, res, next) => {
     const hasActiveSub = buyer && buyer.hasActiveSubscription();
     const isPremiumBuyer = buyer && (buyer.isPremiumBuyer || buyer.subscriptionType === 'combo') && hasActiveSub;
 
-    // Apply 5-10% discount for premium buyers
+    // Apply flat 5% discount for premium buyers
     let discountPercentage = 0;
+    let discountAmount = 0;
     if (isPremiumBuyer) {
-      discountPercentage = Math.floor(Math.random() * 6) + 5; // 5-10%
+      discountPercentage = 5;
+      discountAmount = Number((note.price * discountPercentage / 100).toFixed(2));
     }
-    const discountAmount = Number((note.price * discountPercentage / 100).toFixed(2));
     const priceAfterDiscount = Number((note.price - discountAmount).toFixed(2));
 
-    // Premium buyers pay 0% gateway fee; free buyers pay 2%
-    const gatewayFee = isPremiumBuyer ? 0 : Number((priceAfterDiscount * 0.02).toFixed(2));
+    // Premium buyers pay 0% gateway fee; non-premium buyers pay 2% of original price
+    const gatewayFee = isPremiumBuyer ? 0 : Number((note.price * 0.02).toFixed(2));
+
+    // Total amount: premium = discounted price, non-premium = original + 2% fee
+    const totalAmount = isPremiumBuyer
+      ? priceAfterDiscount
+      : Number((note.price + gatewayFee).toFixed(2));
+
+    // Platform fee for display (not used in payment)
     const serviceFeeRate = config.platformFeePercent / 100; // 20%
-    const serviceFee = Number((priceAfterDiscount * serviceFeeRate).toFixed(2));
+    const serviceFee = isPremiumBuyer
+      ? Number((priceAfterDiscount * serviceFeeRate).toFixed(2))
+      : Number((note.price * serviceFeeRate).toFixed(2));
     const platformFee = Number((gatewayFee + serviceFee).toFixed(2));
-    const totalAmount = Number((priceAfterDiscount + gatewayFee).toFixed(2));
 
     // Create Razorpay order
     const options = {

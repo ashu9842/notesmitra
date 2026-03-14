@@ -24,8 +24,8 @@ function BulletList({ items }: { items: (string | React.ReactNode)[] }) {
     <ul className="space-y-1.5 text-sm text-muted-foreground">
       {items.map((item, i) => (
         <li key={i} className="flex gap-2">
-          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400/70 shrink-0" />
-          <span>{item}</span>
+            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-400/70 shrink-0" />
+            <span>{item}</span>
         </li>
       ))}
     </ul>
@@ -61,15 +61,15 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                     <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/50 dark:bg-indigo-950/20 p-3">
                       <p className="font-medium text-foreground mb-1.5">Platform Service Charge (Seller-side)</p>
                       <BulletList items={[
-                        "18% per sale, charged to the seller",
+                        "18% per sale, charged to the seller (non-premium buyers: 18% of original price; premium buyers: 18% of discounted price)",
                         "Covers platform infrastructure, hosting, moderation, quality checks, admin review, and customer support"
                       ]} />
                     </div>
                     <div className="rounded-xl border border-violet-100 dark:border-violet-900/50 bg-violet-50/50 dark:bg-violet-950/20 p-3">
                       <p className="font-medium text-foreground mb-1.5">Platform Transaction Handling Fee</p>
                       <BulletList items={[
-                        "2% platform handling fee",
-                        "Charged to buyer at checkout and to seller from earnings",
+                        "2% platform handling fee (charged to buyer only for non-premium buyers)",
+                        "No transaction fee for premium buyers",
                         "For platform-level order processing, transaction tracking, security monitoring, and settlement handling"
                       ]} />
                     </div>
@@ -85,18 +85,17 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                 </div>
 
                 <div>
-                  <SubSection title="Earnings Distribution (Indicative)" />
+                  <SubSection title="Earnings & Distribution (Indicative)" />
                   <div className="rounded-xl border border-border bg-muted/30 dark:bg-white/[0.03] p-4 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground text-sm">Seller receives</span>
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400">~80% of note price</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">80% of original note price</span>
                     </div>
                     <div className="h-px bg-border" />
-                    <p className="text-muted-foreground text-sm">Platform earns (total 22%):</p>
+                    <p className="text-muted-foreground text-sm">Platform earns:</p>
                     <BulletList items={[
-                      "18% service charge (from seller)",
-                      "2% transaction handling fee (from seller)",
-                      "2% transaction handling fee (from buyer)"
+                      "18% service charge (from seller; non-premium: 18% of original price, premium: 18% of discounted price)",
+                      "2% transaction handling fee (from buyer; non-premium only)"
                     ]} />
                     <p className="text-xs text-muted-foreground italic pt-1">Final settlement may vary slightly by payment method.</p>
                   </div>
@@ -124,7 +123,8 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                 <div>
                   <SubSection title="2. Buyer Payment Terms" />
                   <BulletList items={[
-                    "Listed note price + 2% platform transaction handling fee",
+                    "Non-premium buyers: Listed note price + 2% platform transaction handling fee",
+                    "Premium buyers: 5% discount on listed price, no transaction fee",
                     "Payments are processed via secure third-party gateways",
                     "Instant access is granted after successful payment",
                     "No refunds after download, except for verified quality issues approved by admin"
@@ -134,8 +134,9 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                 <div>
                   <SubSection title="3. Seller Payout Terms" />
                   <BulletList items={[
-                    "Sellers receive approximately 80% of the listed note price",
-                    "Deductions: 18% service charge + 2% transaction fee",
+                    "Sellers receive 80% of the original note price (regardless of buyer type)",
+                    "Platform commission: 18% of original price (non-premium buyers), 18% of discounted price (premium buyers)",
+                    "No 2% transaction fee is deducted from seller earnings for premium buyers",
                     "Earnings are credited instantly to seller wallet after each sale",
                     "Minimum withdrawal: ₹100 · Maximum per transaction: ₹500",
                     "Processing time: 1–2 business days · Valid UPI ID mandatory"
@@ -146,7 +147,7 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                   <SubSection title="4. Transaction Example (for a ₹100 note)" />
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20 p-3">
-                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide">Buyer Side</p>
+                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide">Non-Premium Buyer</p>
                       <div className="space-y-1 text-sm text-muted-foreground">
                         <div className="flex justify-between"><span>Note price</span><span>₹100</span></div>
                         <div className="flex justify-between"><span>Fee (2%)</span><span>₹2</span></div>
@@ -159,10 +160,26 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                       <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Seller Side</p>
                       <div className="space-y-1 text-sm text-muted-foreground">
                         <div className="flex justify-between"><span>Service (18%)</span><span>−₹18</span></div>
-                        <div className="flex justify-between"><span>Txn fee (2%)</span><span>−₹2</span></div>
-                        <div className="flex justify-between font-semibold text-foreground border-t border-emerald-200 dark:border-emerald-800/40 pt-1 mt-1">
-                          <span>Seller receives</span><span className="text-emerald-600 dark:text-emerald-400">₹80</span>
+                        <div className="flex justify-between"><span>Seller receives</span><span className="text-emerald-600 dark:text-emerald-400">₹80</span></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="rounded-xl border border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20 p-3">
+                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide">Premium Buyer</p>
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <div className="flex justify-between"><span>Note price</span><span>₹100</span></div>
+                        <div className="flex justify-between"><span>Discount (5%)</span><span>−₹5</span></div>
+                        <div className="flex justify-between font-semibold text-foreground border-t border-blue-200 dark:border-blue-800/40 pt-1 mt-1">
+                          <span>Total payable</span><span className="text-blue-600 dark:text-blue-400">₹95</span>
                         </div>
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Seller Side</p>
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <div className="flex justify-between"><span>Seller receives (80% of original)</span><span>₹80</span></div>
+                        <div className="flex justify-between"><span>Platform commission (18% of discounted)</span><span>−₹17.10</span></div>
                       </div>
                     </div>
                   </div>
