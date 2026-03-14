@@ -53,12 +53,22 @@ export function Wallet({ balance, transactions, onWithdraw, onTopUp, onRefresh, 
 
   // Filter transactions for admin - only show platform earnings
   const displayTransactions = isAdmin 
-    ? transactions.filter(t => 
-        t.description.includes("Platform Fee") || 
-        t.description.includes("Premium") ||
-        t.description.includes("Featured Note") ||
-        t.description.includes("Withdrawal")
-      )
+    ? transactions
+        .filter(t => 
+          t.description.includes("Platform Fee") || 
+          t.description.includes("Premium") ||
+          t.description.includes("Featured Note") ||
+          t.description.includes("Withdrawal")
+        )
+        .map(t => {
+          let label = t.description;
+          if (typeof label === 'string' && label.toLowerCase().includes('gateway 0%')) {
+            label = label.replace(/Platform Fee \(Gateway 0% \+ Service 20%\)/i, 'Platform Fee (with discounted)');
+          } else if (typeof label === 'string' && label.toLowerCase().includes('gateway 2%')) {
+            label = label.replace(/Platform Fee \(Gateway 2% \+ Service 20%\)/i, 'Platform Fee');
+          }
+          return { ...t, description: label };
+        })
     : transactions;
 
   const amount = parseFloat(withdrawAmount) || 0;

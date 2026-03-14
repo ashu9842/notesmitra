@@ -674,27 +674,40 @@ export default function App() {
       // Use full platform wallet transactions if available, else fall back to recentPurchases
       const walletTxns: any[] = data.stats?.platformWalletTransactions || [];
       if (walletTxns.length > 0) {
-        setAdminTransactions(walletTxns.map((t: any) => ({
-          id: t.id,
-          type: t.type,
-          amount: t.amount,
-          description: t.description,
-          date: t.timestamp || new Date().toISOString(),
-          status: t.status || "completed"
-        })));
+        setAdminTransactions(walletTxns.map((t: any) => {
+          let label = t.description;
+          if (typeof label === 'string' && label.toLowerCase().includes('gateway 0%')) {
+            label = label.replace(/Platform Fee \(Gateway 0% \+ Service 20%\)/i, 'Platform Fee (with discounted)');
+          } else if (typeof label === 'string' && label.toLowerCase().includes('gateway 2%')) {
+            label = label.replace(/Platform Fee \(Gateway 2% \+ Service 20%\)/i, 'Platform Fee');
+          }
+          return {
+            id: t.id,
+            type: t.type,
+            amount: t.amount,
+            description: label,
+            date: t.timestamp || new Date().toISOString(),
+            status: t.status || "completed"
+          };
+        }));
       } else {
         const recentPurchases = data.stats?.recentPurchases || [];
-        setAdminTransactions(recentPurchases.map((purchase: any) => ({
-          id: purchase._id || purchase.id,
-          type: "credit",
-          amount: purchase.platformFee || 0,
-          description:
-            (purchase.description && purchase.description.toLowerCase().includes('gateway 0%'))
-              ? `Platform Fee (with discounted): ${purchase.noteId?.title || "Note"}`
-              : `Platform Fee: ${purchase.noteId?.title || "Note"}`,
-          date: purchase.createdAt || new Date().toISOString(),
-          status: purchase.status || "completed"
-        })));
+        setAdminTransactions(recentPurchases.map((purchase: any) => {
+          let label = purchase.description || '';
+          if (typeof label === 'string' && label.toLowerCase().includes('gateway 0%')) {
+            label = `Platform Fee (with discounted): ${purchase.noteId?.title || "Note"}`;
+          } else if (typeof label === 'string' && label.toLowerCase().includes('gateway 2%')) {
+            label = `Platform Fee: ${purchase.noteId?.title || "Note"}`;
+          }
+          return {
+            id: purchase._id || purchase.id,
+            type: "credit",
+            amount: purchase.platformFee || 0,
+            description: label,
+            date: purchase.createdAt || new Date().toISOString(),
+            status: purchase.status || "completed"
+          };
+        }));
       }
     } catch (error: any) {
       const message = error.message || "Failed to load admin stats";
