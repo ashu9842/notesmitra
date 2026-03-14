@@ -168,25 +168,25 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                                           <span className="font-semibold">Non-Premium Buyer</span>
                                           <ul className="list-disc ml-6">
                                             <li>Note price: ₹100</li>
-                                            <li>Fee (2%): ₹2</li>
+                                            <li>Fee (2%): <span className="text-red-600">-₹2</span></li>
                                             <li><b>Total payable: ₹102</b></li>
                                           </ul>
                                           <span className="font-semibold">Seller Side (Non-Premium Buyer)</span>
                                           <ul className="list-disc ml-6">
-                                            <li>Seller receives (80% of original): ₹80</li>
-                                            <li>Platform commission (18% of original): −₹18</li>
+                                            <li>Seller receives (80% of original): <span className="text-green-700">₹80</span></li>
+                                            <li>Platform commission (18% of original): <span className="text-red-600">-₹18</span></li>
                                           </ul>
                                         </div>
                                         <span className="font-semibold">Premium Buyer</span>
                                         <ul className="list-disc ml-6">
                                           <li>Note price: ₹100</li>
-                                          <li>Discount (5%): −₹5</li>
+                                          <li>Discount (5%): <span className="text-red-600">-₹5</span></li>
                                           <li><b>Total payable: ₹95</b></li>
                                         </ul>
                                         <span className="font-semibold">Seller Side (Premium Buyer)</span>
                                         <ul className="list-disc ml-6">
-                                          <li>Seller receives (80% of original): ₹80</li>
-                                          <li>Platform commission (18% of discounted): −₹17.10</li>
+                                          <li>Seller receives (80% of original): <span className="text-green-700">₹80</span></li>
+                                          <li>Platform commission (18% of discounted): <span className="text-red-600">-₹17.10</span></li>
                                         </ul>
                                       </div>
                                     </div>
