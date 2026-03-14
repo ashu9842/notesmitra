@@ -749,19 +749,26 @@ export const getPurchasesService = async ({ userId, page = 1, limit = 10 }) => {
 };
 
 export const getSalesService = async (userId) => {
-  const sales = await Purchase.find({ sellerId: userId, status: 'completed' })
-    .populate('noteId', 'title subject semester price')
-    .populate('buyerId', 'name email')
-    .sort({ createdAt: -1 });
+  const [sales, sellerNotes] = await Promise.all([
+    Purchase.find({ sellerId: userId, status: 'completed' })
+      .populate('noteId', 'title subject semester price')
+      .populate('buyerId', 'name email')
+      .sort({ createdAt: -1 }),
+    Note.find({ sellerId: userId }).select('downloads').lean()
+  ]);
 
+  const totalSales = sales.length;
   const totalEarnings = sales.reduce((sum, sale) => sum + Number(sale.sellerEarnings || 0), 0);
+  const totalDownloads = sellerNotes.reduce((sum, note) => sum + Number(note.downloads || 0), 0);
 
   return {
     statusCode: 200,
     payload: {
       success: true,
-      count: sales.length,
+      count: totalSales,
+      totalSales,
       totalEarnings,
+      totalDownloads,
       sales
     }
   };

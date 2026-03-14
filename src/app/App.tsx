@@ -317,7 +317,6 @@ export default function App() {
   const [purchasedNotes, setPurchasedNotes] = useState<string[]>([]);
   const [walletBalance, setWalletBalance] = useState(0);
   const [walletWithdrawableBalance, setWalletWithdrawableBalance] = useState<number | null>(null);
-  const [walletTotalEarnings, setWalletTotalEarnings] = useState<number | null>(null);
   const [adminWalletBalance, setAdminWalletBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingWallet, setIsLoadingWallet] = useState(false);
@@ -592,7 +591,7 @@ export default function App() {
   const loadSellerOwnNotes = async () => {
     if (!currentUser?.id) return;
     try {
-      const data = await notesAPI.getAll({ sellerId: currentUser.id });
+      const data = await notesAPI.getAll({ sellerId: currentUser.id, limit: 500 });
       setSellerOwnNotes((data.notes || []).map(mapNoteFromApi));
     } catch {
       // non-critical — seller dashboard degrades gracefully
@@ -608,14 +607,11 @@ export default function App() {
       setWalletBalance(balance);
       const available = Number(data.withdrawableBalance ?? balance);
       setWalletWithdrawableBalance(Number.isFinite(available) ? available : balance);
-      const earnings = Number(data.userEarnings?.totalEarnings);
-      setWalletTotalEarnings(Number.isFinite(earnings) ? earnings : null);
       if (currentUser?.role === "admin") {
         setAdminWalletBalance(balance);
       }
     } catch (error: any) {
       setWalletWithdrawableBalance(null);
-      setWalletTotalEarnings(null);
       if (currentUser) {
         const raw = error.message || "Failed to load wallet";
         const message = raw === '__SERVER_STARTING__' ? 'Server is starting up. Please refresh in a moment.' : raw;
@@ -711,15 +707,18 @@ export default function App() {
 
     try {
       const data = await paymentAPI.getSales();
-      const totalSales = data.count || 0;
+      const totalSales = Number(data.totalSales ?? data.count ?? 0);
       const totalEarnings = Number(data.totalEarnings || 0);
+      const totalDownloadsFromApi = Number(data.totalDownloads);
 
       // Use sellerOwnNotes (all statuses) — not the marketplace notes (approved-only)
       const approvedNotes = sellerOwnNotes.filter(note => note.status === "approved").length;
       const pendingNotes = sellerOwnNotes.filter(note => note.status === "pending_review").length;
       const rejectedNotes = sellerOwnNotes.filter(note => note.status === "rejected" || note.status === "failed_quality_check").length;
 
-      const totalDownloads = sellerOwnNotes.reduce((sum, n) => sum + (n.downloads || 0), 0);
+      const totalDownloads = Number.isFinite(totalDownloadsFromApi)
+        ? totalDownloadsFromApi
+        : sellerOwnNotes.reduce((sum, n) => sum + (n.downloads || 0), 0);
 
       setSellerStats({
         totalSales,
@@ -772,7 +771,6 @@ export default function App() {
     if (!currentUser) {
       setWalletBalance(0);
       setWalletWithdrawableBalance(null);
-      setWalletTotalEarnings(null);
       setTransactions([]);
       setPurchasedNotes([]);
       setSupportTickets([]);
@@ -1942,7 +1940,7 @@ export default function App() {
                     onRefresh={loadTransactions}
                     isLoading={isLoadingWallet}
                     errorMessage={walletError}
-                    totalEarningsOverride={walletTotalEarnings ?? sellerStats.totalEarnings}
+                    totalEarningsOverride={sellerStats.totalEarnings}
                     availableBalanceOverride={walletWithdrawableBalance ?? walletBalance}
                   />
                 </TabsContent>
