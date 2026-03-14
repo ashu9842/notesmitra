@@ -240,14 +240,16 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
     throw createError('Please provide noteId and paymentMethod', 400);
   }
 
-  const note = await Note.findById(noteId);
 
+  const note = await Note.findById(noteId);
   if (!note) {
     throw createError('Note not found', 404);
   }
-
   if (note.status !== 'approved') {
     throw createError('Note is not available for purchase', 400);
+  }
+  if (typeof note.price !== 'number' || isNaN(note.price) || note.price <= 0) {
+    throw createError('Invalid note price. Please contact support.', 400);
   }
 
   const existingPurchase = await Purchase.findOne({
@@ -260,8 +262,8 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
   }
 
   // Calculate pricing with premium benefits
-  const pricing = await calculatePremiumPricing(note.price, userId);
 
+  const pricing = await calculatePremiumPricing(note.price, userId);
   const {
     originalPrice,
     discountPercentage,
@@ -274,6 +276,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
     isPremiumBuyer,
     savings
   } = pricing;
+  if (typeof totalAmount !== 'number' || isNaN(totalAmount) || totalAmount <= 0) {
+    throw createError('Invalid purchase amount. Please contact support.', 400);
+  }
 
   if (paymentMethod === 'wallet') {
     const transactionResult = await runTransaction(async (session) => {
