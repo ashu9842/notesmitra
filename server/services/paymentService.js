@@ -37,41 +37,40 @@ const calculatePremiumPricing = async (notePrice, userId) => {
   const hasActiveSubscription = user && user.hasActiveSubscription();
   const isPremiumBuyer = user && (user.isPremiumBuyer || user.subscriptionType === 'combo') && hasActiveSubscription;
 
-  // Apply discount for premium buyers (5-10% random)
+  // Premium buyers get a flat 5% discount
   let discountPercentage = 0;
   let discountAmount = 0;
-  
   if (isPremiumBuyer) {
-    // Random discount between 5-10%
-    discountPercentage = Math.floor(Math.random() * 6) + 5; // 5 to 10
+    discountPercentage = 5;
     discountAmount = Number((notePrice * discountPercentage / 100).toFixed(2));
   }
-
   const priceAfterDiscount = Number((notePrice - discountAmount).toFixed(2));
 
-  // Premium buyers pay 0% gateway fee; free buyers pay 2%
-  const gatewayFee = isPremiumBuyer ? 0 : Number((priceAfterDiscount * 0.02).toFixed(2));
+  // Seller always gets 80% of original price
+  const sellerEarnings = Number((notePrice * 0.8).toFixed(2));
 
-  // 20% service charge deducted from seller's share (18% service + 2% seller platform fee)
-  // Controlled by PLATFORM_FEE_PERCENT=20 in .env
-  const serviceFeeRate = config.platformFeePercent / 100;
-  const serviceFee = Number((priceAfterDiscount * serviceFeeRate).toFixed(2));
+  // Platform gets 18% of original price (non-premium), 18% of discounted price (premium)
+  let platformCommission = 0;
+  if (isPremiumBuyer) {
+    platformCommission = Number((priceAfterDiscount * 0.18).toFixed(2));
+  } else {
+    platformCommission = Number((notePrice * 0.18).toFixed(2));
+  }
 
-  // Buyer pays: note price + 2% transaction fee
-  const totalAmount = Number((priceAfterDiscount + gatewayFee).toFixed(2));
+  // Platform gets 2% of original price from buyer (non-premium only)
+  const gatewayFee = isPremiumBuyer ? 0 : Number((notePrice * 0.02).toFixed(2));
 
-  // Seller receives 80% of the note price
-  const sellerEarnings = Number((priceAfterDiscount - serviceFee).toFixed(2));
-
-  // Platform receives: 2% from buyer + 20% from seller = 22% of note price
-  const commissionAmount = Number((gatewayFee + serviceFee).toFixed(2));
+  // Buyer pays: discounted price (if premium) or original price (if not) + 2% fee (if not premium)
+  const totalAmount = isPremiumBuyer
+    ? priceAfterDiscount
+    : Number((notePrice + gatewayFee).toFixed(2));
 
   return {
     originalPrice: notePrice,
     discountPercentage,
     discountAmount,
     priceAfterDiscount,
-    commissionAmount,
+    platformCommission,
     gatewayFee,
     totalAmount,
     sellerEarnings,

@@ -659,29 +659,41 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
 
                   <div className="border rounded-lg p-4 space-y-2">
                     <div className="flex items-start justify-between gap-3 text-sm">
-                      <span className="text-muted-foreground">Note Price:</span>
+                      <span className="text-muted-foreground">Note Price (Original):</span>
                       <span className="shrink-0">₹{selectedNote.price.toFixed(2)}</span>
                     </div>
+                    {buyerPremium?.active && (
+                      <div className="flex items-start justify-between gap-3 text-green-600 text-sm">
+                        <span>Premium Discount (5%):</span>
+                        <span className="text-right">-₹{(selectedNote.price * 0.05).toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className={`flex items-start justify-between gap-3 text-sm ${buyerPremium?.active ? 'text-green-600' : 'text-muted-foreground'}`}>
                       <span className="min-w-0 break-words">{buyerPremium?.active ? 'Transaction Fee (0% — Premium! 🎉)' : 'Transaction Fee (2%):'}</span>
                       <span className="shrink-0">{buyerPremium?.active ? '₹0.00' : `₹${(selectedNote.price * 0.02).toFixed(2)}`}</span>
                     </div>
-                    {buyerPremium?.active && (
-                      <div className="flex items-start justify-between gap-3 text-green-600 text-sm">
-                        <span>Exclusive Discount:</span>
-                        <span className="text-right">5–10% applied at checkout</span>
-                      </div>
-                    )}
+                    <div className="flex items-start justify-between gap-3 text-sm text-blue-700">
+                      <span>Seller Earnings (80% of original):</span>
+                      <span>₹{(selectedNote.price * 0.8).toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-start justify-between gap-3 text-sm text-purple-700">
+                      <span>Platform Commission:</span>
+                      <span>
+                        {buyerPremium?.active
+                          ? `₹${((selectedNote.price * 0.95) * 0.18).toFixed(2)} (18% of discounted)`
+                          : `₹${(selectedNote.price * 0.18).toFixed(2)} (18% of original)`}
+                      </span>
+                    </div>
                     <div className="border-t pt-2 flex items-start justify-between gap-3 font-semibold">
-                      <span>Total:</span>
+                      <span>Total to Pay:</span>
                       <span className="flex items-baseline gap-1">
                         {buyerPremium?.active ? (
                           <>
                             <span className="line-through text-muted-foreground text-sm font-normal">
                               ₹{(selectedNote.price * 1.02).toFixed(2)}
                             </span>
-                            <span className="text-green-600">₹{selectedNote.price.toFixed(2)}</span>
-                            <span className="text-green-600 text-xs font-normal">(5–10% off)</span>
+                            <span className="text-green-600">₹{(selectedNote.price * 0.95).toFixed(2)}</span>
+                            <span className="text-green-600 text-xs font-normal">(5% off)</span>
                           </>
                         ) : `₹${(selectedNote.price * 1.02).toFixed(2)}`}
                       </span>
@@ -689,7 +701,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
                     {buyerPremium?.active && (
                       <div className="text-xs text-green-600 bg-green-50 dark:bg-green-950/30 rounded px-2 py-1 flex items-start gap-1 mt-1">
                         <Crown className="w-3 h-3 mt-0.5 shrink-0" />
-                        <span className="leading-relaxed break-words">Premium: Zero gateway fee + exclusive discount applied!</span>
+                        <span className="leading-relaxed break-words">Premium: Zero gateway fee + 5% discount applied!</span>
                       </div>
                     )}
                   </div>
