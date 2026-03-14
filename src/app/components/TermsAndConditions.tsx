@@ -288,6 +288,6 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                                                   <div className="text-xs text-muted-foreground mt-2">Last updated: March 15, 2026. By using this platform, you agree to these terms and conditions.</div>
                                                 </div>
                                               </ScrollArea>
-                                            </DialogContent>
-                                          </Dialog>
-                                        );
+      </DialogContent>
+    </Dialog>
+  );
