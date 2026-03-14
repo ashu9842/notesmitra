@@ -285,7 +285,7 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
     discountPercentage,
     discountAmount,
     priceAfterDiscount,
-    commissionAmount,
+    platformCommission,
     gatewayFee,
     totalAmount,
     sellerEarnings,
@@ -408,11 +408,10 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
 
       // Credit platform commission wallet only if PLATFORM_USER_ID is configured
       if (platformUserId) {
-        if (typeof commissionAmount !== 'number' || isNaN(commissionAmount) || commissionAmount < 0) {
+        if (typeof platformCommission !== 'number' || isNaN(platformCommission) || platformCommission < 0) {
           throw createError('Invalid platform commission amount. Please contact support.', 400);
         }
         let platformWallet = await Wallet.findOne({ userId: platformUserId }).session(session);
-
         if (!platformWallet) {
           platformWallet = await Wallet.create([
             {
@@ -424,26 +423,22 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
           ], { session });
           platformWallet = platformWallet[0];
         }
-
         // Ensure platform wallet balance is valid
         if (typeof platformWallet.balance !== 'number' || isNaN(platformWallet.balance)) {
           platformWallet.balance = 0;
         }
-
-        platformWallet.balance = Number((platformWallet.balance + commissionAmount).toFixed(2));
+        platformWallet.balance = Number((platformWallet.balance + platformCommission).toFixed(2));
         platformWallet.transactions.unshift({
           id: `txn_${uuidv4()}`,
           type: 'credit',
-          amount: commissionAmount,
+          amount: platformCommission,
           description: `Platform Fee (Txn 2% + Service 20%): ${note.title}`,
           status: 'completed',
           timestamp: new Date()
         });
-        
         // Update available balance after adding credit
         await platformWallet.updateAvailableBalance();
         await platformWallet.save({ session });
-
         await User.findByIdAndUpdate(
           platformUserId,
           { walletBalance: platformWallet.balance },
@@ -458,7 +453,7 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
           buyerId: userId,
           sellerId: note.sellerId,
           amount: priceAfterDiscount,
-          platformFee: commissionAmount,
+          platformFee: platformCommission,
           totalAmount,
           sellerEarnings,
           paymentMethod,
@@ -513,7 +508,7 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
     buyerId: userId,
     sellerId: note.sellerId,
     amount: priceAfterDiscount,
-    platformFee: commissionAmount,
+    platformFee: platformCommission,
     totalAmount,
     sellerEarnings,
     paymentMethod,
