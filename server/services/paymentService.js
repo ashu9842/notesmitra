@@ -30,11 +30,16 @@ const getRequestContext = (requestContext = {}) => ({
  * @returns {Object} - Pricing breakdown
  */
 const calculatePremiumPricing = async (notePrice, userId) => {
+  // Validate notePrice before any calculations
+  if (typeof notePrice !== 'number' || isNaN(notePrice) || notePrice <= 0) {
+    throw new Error(`Invalid note price: ${notePrice}`);
+  }
+
   const user = await User.findById(userId).select(
     'isPremiumBuyer subscriptionType subscriptionExpiry'
   );
 
-  const hasActiveSubscription = user && user.hasActiveSubscription();
+  const hasActiveSubscription = user && user.hasActiveSubscription?.();
   const isPremiumBuyer = user && (user.isPremiumBuyer || user.subscriptionType === 'combo') && hasActiveSubscription;
 
   // Premium buyers get a flat 5% discount
@@ -64,6 +69,14 @@ const calculatePremiumPricing = async (notePrice, userId) => {
   const totalAmount = isPremiumBuyer
     ? priceAfterDiscount
     : Number((notePrice + gatewayFee).toFixed(2));
+
+  // Validate all calculated amounts are valid numbers
+  const amounts = { discountAmount, priceAfterDiscount, sellerEarnings, platformCommission, gatewayFee, totalAmount };
+  for (const [key, value] of Object.entries(amounts)) {
+    if (typeof value !== 'number' || isNaN(value) || (value < 0 && key !== 'discountAmount')) {
+      throw new Error(`Invalid calculated ${key}: ${value}`);
+    }
+  }
 
   return {
     originalPrice: notePrice,
@@ -301,11 +314,25 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
 
       const buyerWallet = await Wallet.findOne({ userId }).session(session);
 
-      if (!buyerWallet || buyerWallet.balance < totalAmount) {
+      if (!buyerWallet) {
+        throw createError('Wallet not found. Please recharge your wallet and try again.', 400);
+      }
+
+      // Ensure balance is a valid number
+      if (typeof buyerWallet.balance !== 'number' || isNaN(buyerWallet.balance)) {
+        throw createError('Invalid wallet balance. Please contact support.', 400);
+      }
+
+      if (buyerWallet.balance < totalAmount) {
         throw createError('Insufficient wallet balance', 400);
       }
 
-      buyerWallet.balance -= totalAmount;
+      // Ensure totalAmount is valid before subtraction
+      if (typeof totalAmount !== 'number' || isNaN(totalAmount) || totalAmount <= 0) {
+        throw createError('Invalid transaction amount. Please contact support.', 400);
+      }
+
+      buyerWallet.balance = Number((buyerWallet.balance - totalAmount).toFixed(2));
       buyerWallet.transactions.unshift({
         id: `txn_${uuidv4()}`,
         type: 'debit',
@@ -346,7 +373,17 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
         sellerWallet = sellerWallet[0];
       }
 
-      sellerWallet.balance += sellerEarnings;
+      // Ensure seller wallet balance is valid
+      if (typeof sellerWallet.balance !== 'number' || isNaN(sellerWallet.balance)) {
+        sellerWallet.balance = 0;
+      }
+
+      // Ensure sellerEarnings is valid before addition
+      if (typeof sellerEarnings !== 'number' || isNaN(sellerEarnings) || sellerEarnings < 0) {
+        throw createError('Invalid seller earnings. Please contact support.', 400);
+      }
+
+      sellerWallet.balance = Number((sellerWallet.balance + sellerEarnings).toFixed(2));
       sellerWallet.transactions.unshift({
         id: `txn_${uuidv4()}`,
         type: 'credit',
@@ -371,6 +408,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
 
       // Credit platform commission wallet only if PLATFORM_USER_ID is configured
       if (platformUserId) {
+        if (typeof commissionAmount !== 'number' || isNaN(commissionAmount) || commissionAmount < 0) {
+          throw createError('Invalid platform commission amount. Please contact support.', 400);
+        }
         let platformWallet = await Wallet.findOne({ userId: platformUserId }).session(session);
 
         if (!platformWallet) {
@@ -385,7 +425,12 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
           platformWallet = platformWallet[0];
         }
 
-        platformWallet.balance += commissionAmount;
+        // Ensure platform wallet balance is valid
+        if (typeof platformWallet.balance !== 'number' || isNaN(platformWallet.balance)) {
+          platformWallet.balance = 0;
+        }
+
+        platformWallet.balance = Number((platformWallet.balance + commissionAmount).toFixed(2));
         platformWallet.transactions.unshift({
           id: `txn_${uuidv4()}`,
           type: 'credit',
