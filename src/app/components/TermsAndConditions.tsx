@@ -145,6 +145,7 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
 
                 <div>
                   <SubSection title="4. Transaction Example (for a ₹100 note)" />
+                  {/* Non-Premium Buyer Example */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl border border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20 p-3">
                       <p className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide">Non-Premium Buyer</p>
@@ -157,13 +158,14 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                       </div>
                     </div>
                     <div className="rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
-                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Seller Side</p>
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Seller Side (Non-Premium Buyer)</p>
                       <div className="space-y-1 text-sm text-muted-foreground">
-                        <div className="flex justify-between"><span>Service (18%)</span><span>−₹18</span></div>
-                        <div className="flex justify-between"><span>Seller receives</span><span className="text-emerald-600 dark:text-emerald-400">₹80</span></div>
+                        <div className="flex justify-between"><span>Seller receives (80% of original)</span><span className="text-emerald-600 dark:text-emerald-400">₹80</span></div>
+                        <div className="flex justify-between"><span>Platform commission (18% of original)</span><span>−₹18</span></div>
                       </div>
                     </div>
                   </div>
+                  {/* Premium Buyer Example */}
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     <div className="rounded-xl border border-blue-200 dark:border-blue-800/50 bg-blue-50/60 dark:bg-blue-950/20 p-3">
                       <p className="text-xs font-bold text-blue-600 dark:text-blue-400 mb-2 uppercase tracking-wide">Premium Buyer</p>
@@ -176,9 +178,9 @@ export function TermsAndConditions({ isOpen, onClose }: TermsAndConditionsProps)
                       </div>
                     </div>
                     <div className="rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/60 dark:bg-emerald-950/20 p-3">
-                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Seller Side</p>
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mb-2 uppercase tracking-wide">Seller Side (Premium Buyer)</p>
                       <div className="space-y-1 text-sm text-muted-foreground">
-                        <div className="flex justify-between"><span>Seller receives (80% of original)</span><span>₹80</span></div>
+                        <div className="flex justify-between"><span>Seller receives (80% of original)</span><span className="text-emerald-600 dark:text-emerald-400">₹80</span></div>
                         <div className="flex justify-between"><span>Platform commission (18% of discounted)</span><span>−₹17.10</span></div>
                       </div>
                     </div>
