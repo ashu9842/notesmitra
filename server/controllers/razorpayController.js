@@ -120,6 +120,7 @@ export const verifyWalletPayment = async (req, res, next) => {
         userId: req.user._id,
         tenantId: user.tenantId,
         balance: 0,
+        availableBalance: 0,
         transactions: []
       });
     }
@@ -138,6 +139,9 @@ export const verifyWalletPayment = async (req, res, next) => {
     // Update wallet
     wallet.balance += amount;
     wallet.transactions.unshift(transaction);
+    
+    // Update available balance
+    await wallet.updateAvailableBalance();
     await wallet.save();
 
     // Update user wallet balance
@@ -490,6 +494,7 @@ export const verifyNotePayment = async (req, res, next) => {
         userId: note.sellerId,
         tenantId: note.tenantId,
         balance: 0,
+        availableBalance: 0,
         transactions: []
       });
     }
@@ -503,6 +508,9 @@ export const verifyNotePayment = async (req, res, next) => {
       status: 'completed',
       timestamp: new Date()
     });
+    
+    // Update available balance
+    await sellerWallet.updateAvailableBalance();
     await sellerWallet.save();
 
     // Update seller's profile
@@ -526,6 +534,7 @@ export const verifyNotePayment = async (req, res, next) => {
           userId: platformUserId,
           tenantId: note.tenantId,
           balance: 0,
+          availableBalance: 0,
           transactions: []
         });
       }
@@ -539,6 +548,9 @@ export const verifyNotePayment = async (req, res, next) => {
         status: 'completed',
         timestamp: new Date()
       });
+      
+      // Update available balance
+      await platformWallet.updateAvailableBalance();
       await platformWallet.save();
       await User.findByIdAndUpdate(platformUserId, { walletBalance: platformWallet.balance });
     }

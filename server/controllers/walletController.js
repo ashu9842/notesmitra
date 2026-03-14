@@ -45,7 +45,7 @@ const getSellerWithdrawableBalance = async ({ userId, wallet }) => {
 export const getWallet = async (req, res, next) => {
   try {
     // Get user with tenantId
-    const user = await User.findById(req.user._id).select('tenantId');
+    const user = await User.findById(req.user._id).select('tenantId role');
     if (!user?.tenantId) {
       return res.status(400).json({
         success: false,
@@ -61,22 +61,19 @@ export const getWallet = async (req, res, next) => {
         userId: req.user._id,
         tenantId: user.tenantId,
         balance: 0,
+        availableBalance: 0,
         transactions: []
       });
     }
 
-    let withdrawableBalance = Number(wallet.balance || 0);
-    if (req.user?.role === ROLES.SELLER) {
-      withdrawableBalance = await getSellerWithdrawableBalance({
-        userId: req.user._id,
-        wallet
-      });
-    }
+    // Recalculate and update available balance
+    await wallet.updateAvailableBalance();
+    await wallet.save();
 
     res.status(200).json({
       success: true,
       wallet,
-      withdrawableBalance
+      withdrawableBalance: wallet.availableBalance
     });
   } catch (error) {
     next(error);
@@ -120,6 +117,7 @@ export const addFunds = async (req, res, next) => {
         userId: req.user._id,
         tenantId: user.tenantId,
         balance: 0,
+        availableBalance: 0,
         transactions: []
       });
     }
@@ -138,7 +136,9 @@ export const addFunds = async (req, res, next) => {
     // Update wallet
     wallet.balance += parseFloat(amount);
     wallet.transactions.unshift(transaction);
-
+    
+    // Update available balance
+    await wallet.updateAvailableBalance();
     await wallet.save();
 
     // Update user wallet balance
@@ -184,15 +184,10 @@ export const withdrawFunds = async (req, res, next) => {
     const wallet = await Wallet.findOne({ userId: req.user._id });
     if (!wallet) return res.status(404).json({ success: false, error: 'Wallet not found' });
 
-    let availableBalance = Number(wallet.balance || 0);
-    if (req.user?.role === ROLES.SELLER) {
-      availableBalance = await getSellerWithdrawableBalance({
-        userId: req.user._id,
-        wallet
-      });
-    }
+    // Update available balance first
+    await wallet.updateAvailableBalance();
 
-    if (availableBalance < parsedAmount) {
+    if (wallet.availableBalance < parsedAmount) {
       return res.status(400).json({ success: false, error: 'Insufficient available balance' });
     }
 
@@ -208,6 +203,9 @@ export const withdrawFunds = async (req, res, next) => {
 
     wallet.balance -= parsedAmount;
     wallet.transactions.unshift(transaction);
+    
+    // Update available balance after adding pending withdrawal
+    await wallet.updateAvailableBalance();
     await wallet.save();
 
     await User.findByIdAndUpdate(req.user._id, { walletBalance: wallet.balance });
@@ -278,6 +276,9 @@ export const completeWithdrawal = async (req, res, next) => {
     }
 
     txn.status = 'completed';
+    
+    // Update available balance after marking as completed
+    await wallet.updateAvailableBalance();
     await wallet.save();
 
     res.status(200).json({ success: true, message: 'Withdrawal marked as completed' });

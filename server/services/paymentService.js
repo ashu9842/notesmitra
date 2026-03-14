@@ -303,6 +303,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
         status: 'completed',
         timestamp: new Date()
       });
+      
+      // Update available balance after debit
+      await buyerWallet.updateAvailableBalance();
       await buyerWallet.save({ session });
 
       await User.findByIdAndUpdate(
@@ -322,6 +325,7 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
             userId: note.sellerId,
             tenantId: note.tenantId,
             balance: 0,
+            availableBalance: 0,
             transactions: []
           }
         ], { session });
@@ -337,6 +341,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
         status: 'completed',
         timestamp: new Date()
       });
+      
+      // Update available balance after adding credit
+      await sellerWallet.updateAvailableBalance();
       await sellerWallet.save({ session });
 
       await User.findByIdAndUpdate(
@@ -357,6 +364,7 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
             {
               userId: platformUserId,
               balance: 0,
+              availableBalance: 0,
               transactions: []
             }
           ], { session });
@@ -372,6 +380,9 @@ export const purchaseNoteService = async ({ userId, noteId, paymentMethod, reque
           status: 'completed',
           timestamp: new Date()
         });
+        
+        // Update available balance after adding credit
+        await platformWallet.updateAvailableBalance();
         await platformWallet.save({ session });
 
         await User.findByIdAndUpdate(
@@ -609,6 +620,7 @@ export const razorpayWebhookService = async ({
       userId: note.sellerId,
       tenantId: note.tenantId,
       balance: 0,
+      availableBalance: 0,
       transactions: []
     });
   }
@@ -622,6 +634,9 @@ export const razorpayWebhookService = async ({
     status: 'completed',
     timestamp: new Date()
   });
+  
+  // Update available balance
+  await sellerWallet.updateAvailableBalance();
   await sellerWallet.save();
 
   await User.findByIdAndUpdate(note.sellerId, {
@@ -642,6 +657,7 @@ export const razorpayWebhookService = async ({
         userId: platformUserId,
         tenantId: note.tenantId,
         balance: 0,
+        availableBalance: 0,
         transactions: []
       });
     }
@@ -654,6 +670,9 @@ export const razorpayWebhookService = async ({
       status: 'completed',
       timestamp: new Date()
     });
+    
+    // Update available balance
+    await platformWallet.updateAvailableBalance();
     await platformWallet.save();
     await User.findByIdAndUpdate(platformUserId, { walletBalance: platformWallet.balance });
   }

@@ -49,6 +49,21 @@ const walletSchema = new mongoose.Schema({
     default: 0,
     min: [0, 'Balance cannot be negative']
   },
+  availableBalance: {
+    type: Number,
+    default: 0,
+    min: [0, 'Available balance cannot be negative']
+  },
+  totalWithdrawn: {
+    type: Number,
+    default: 0,
+    min: [0, 'Total withdrawn cannot be negative']
+  },
+  totalPendingWithdrawals: {
+    type: Number,
+    default: 0,
+    min: [0, 'Pending withdrawals cannot be negative']
+  },
   transactions: [transactionSchema]
 }, {
   timestamps: true
@@ -56,6 +71,50 @@ const walletSchema = new mongoose.Schema({
 
 // Compound unique index - one wallet per user per tenant
 walletSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+walletSchema.index({ userId: 1, availableBalance: 1 });
+
+/**
+ * Calculate available balance for a wallet
+ * For sellers: balance - (total earnings - completed withdrawals)
+ * For others: full balance minus pending withdrawals
+ */
+walletSchema.methods.calculateAvailableBalance = function () {
+  const pendingWithdrawals = (this.transactions || []).reduce((sum, txn) => {
+    if (txn.type === 'debit' && txn.status === 'pending') {
+      return sum + (txn.amount || 0);
+    }
+    return sum;
+  }, 0);
+
+  const completedWithdrawals = (this.transactions || []).reduce((sum, txn) => {
+    if (txn.type === 'debit' && txn.status === 'completed') {
+      return sum + (txn.amount || 0);
+    }
+    return sum;
+  }, 0);
+
+  const available = Math.max(
+    0,
+    Number((this.balance - pendingWithdrawals).toFixed(2))
+  );
+
+  return {
+    availableBalance: available,
+    pendingWithdrawals: Number(pendingWithdrawals.toFixed(2)),
+    completedWithdrawals: Number(completedWithdrawals.toFixed(2))
+  };
+};
+
+/**
+ * Update available balance based on current transactions
+ */
+walletSchema.methods.updateAvailableBalance = async function () {
+  const calc = this.calculateAvailableBalance();
+  this.availableBalance = calc.availableBalance;
+  this.totalPendingWithdrawals = calc.pendingWithdrawals;
+  this.totalWithdrawn = calc.completedWithdrawals;
+  return this;
+};
 
 // Apply tenant plugin
 walletSchema.plugin(tenantPlugin);
