@@ -688,7 +688,10 @@ export default function App() {
           id: purchase._id || purchase.id,
           type: "credit",
           amount: purchase.platformFee || 0,
-          description: `Platform Fee (2%+20%): ${purchase.noteId?.title || "Note"}`,
+          description:
+            (purchase.description && purchase.description.toLowerCase().includes('gateway 0%'))
+              ? `Platform Fee (with discounted): ${purchase.noteId?.title || "Note"}`
+              : `Platform Fee: ${purchase.noteId?.title || "Note"}`,
           date: purchase.createdAt || new Date().toISOString(),
           status: purchase.status || "completed"
         })));
