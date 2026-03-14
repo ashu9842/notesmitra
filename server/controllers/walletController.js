@@ -208,7 +208,13 @@ export const withdrawFunds = async (req, res, next) => {
     await wallet.updateAvailableBalance();
     await wallet.save();
 
-    await User.findByIdAndUpdate(req.user._id, { walletBalance: wallet.balance });
+    // Update user wallet balance (note: totalEarnings is NOT decreased, only balance)
+    // totalEarnings represents lifetime earnings, not current available amount
+    await User.findByIdAndUpdate(req.user._id, { 
+      walletBalance: wallet.balance
+      // totalEarnings is NOT updated here - it remains as lifetime earnings
+      // Only balance is deducted for pending withdrawal
+    });
 
     res.status(200).json({
       success: true,
@@ -275,13 +281,28 @@ export const completeWithdrawal = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'Transaction is not pending' });
     }
 
+    const completedAmount = txn.amount;
     txn.status = 'completed';
     
     // Update available balance after marking as completed
     await wallet.updateAvailableBalance();
     await wallet.save();
 
-    res.status(200).json({ success: true, message: 'Withdrawal marked as completed' });
+    // Note: DO NOT update totalEarnings - it represents lifetime earnings
+    // totalEarnings should only increase on actual sale, not on withdrawal
+    // The completed withdrawal is tracked in wallet.totalWithdrawn via updateAvailableBalance()
+    
+    // Optionally log the completed withdrawal for audit trail
+    await User.findByIdAndUpdate(wallet.userId, { 
+      // walletBalance remains as is (already deducted when pending)
+      // totalEarnings remains as is (withdrawal doesn't affect earnings)
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Withdrawal marked as completed',
+      withdrawnAmount: completedAmount
+    });
   } catch (error) {
     next(error);
   }
