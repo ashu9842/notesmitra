@@ -183,8 +183,12 @@ Rules for each check:
       - CBSE, ICSE, JEE, NEET, GATE, UPSC official question papers or mark schemes
       - "Board of ...", "Examination board", "Question paper"
 
-   NOTE: Do NOT reject student-created notes that merely reference a textbook in a bibliography or citation, or mention a professor name only in a reference list.
-   ALWAYS reject when the document header/footer/cover shows college/university/platform branding.
+  STRICT POLICY (mandatory):
+  - If ANY college/university/institution name appears anywhere, set passed=false.
+  - If ANY professor/instructor name appears anywhere, set passed=false.
+  - If ANY book title/textbook ownership marker appears anywhere, set passed=false.
+  - If logo/emblem/seal/crest markers for institution appear, set passed=false.
+  - Do not allow exceptions for references/bibliography sections.
    failReason should be a concise explanation (≤ 20 words) naming what was detected.
 
 4. watermark — set passed=false when the document contains a NotesMitra purchased-copy watermark:
@@ -372,14 +376,31 @@ export const runGeminiChecks = async (pdfBuffer) => {
   try {
     // Single Groq call covers all 5 checks
     const ai = await analyseWithGroq(extracted.text, extracted.pageCount, extracted.totalChars);
+    const strictCopyright = await ruleBasedCopyright(pdfBuffer);
+
+    const copyrightPassed = Boolean(ai.copyright.passed && strictCopyright.passed);
+    const copyrightFailReason = !ai.copyright.passed
+      ? (ai.copyright.failReason || 'Copyrighted or institutional material detected')
+      : (!strictCopyright.passed
+        ? (strictCopyright.failReason || 'Detected university/college/professor/book ownership markers')
+        : null);
 
     logger.info('geminiQualityChecker: All 5 AI checks completed', {
       blankPage:  ai.blankPage.passed,
       quality:    ai.quality.passed,
-      copyright:  ai.copyright.passed,
+      copyright:  copyrightPassed,
       watermark:  ai.watermark.passed,
       metadata:   ai.metadata.passed,
     });
+
+    if (!ai.copyright.passed && strictCopyright.passed) {
+      logger.warn('geminiQualityChecker: copyright failed by Groq AI');
+    }
+    if (ai.copyright.passed && !strictCopyright.passed) {
+      logger.warn('geminiQualityChecker: strict copyright override applied from rule-based detector', {
+        failReason: strictCopyright.failReason || null,
+      });
+    }
 
     return {
       blankPages: {
@@ -396,9 +417,9 @@ export const runGeminiChecks = async (pdfBuffer) => {
         aiAnalysis: true,
       },
       copyright: {
-        passed: ai.copyright.passed,
-        failReason: ai.copyright.failReason || null,
-        warning: ai.copyright.passed ? null : (ai.copyright.failReason || 'Copyrighted or institutional material detected'),
+        passed: copyrightPassed,
+        failReason: copyrightFailReason,
+        warning: copyrightPassed ? null : (copyrightFailReason || 'Copyrighted or institutional material detected'),
         aiAnalysis: true,
       },
       watermark: {

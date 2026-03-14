@@ -7,7 +7,7 @@ import logger from '../utils/logger.js';
 import { emitAdminStatsUpdate } from '../services/paymentService.js';
 import * as cache from '../utils/cache.js';
 import config from '../config/index.js';
-import { downloadCloudinaryFile, deleteFromCloudinary } from '../config/cloudinary.js';
+import { downloadCloudinaryFile, deleteFromCloudinary, generateSignedUrl } from '../config/cloudinary.js';
 import fileAccessService from '../services/fileAccessService.js';
 import { getOrCreatePreview } from '../services/pdfPreviewService.js';
 import AppError from '../utils/AppError.js';
@@ -158,6 +158,7 @@ export const uploadNote = async (req, res, next) => {
       metadataCheck: true
     };
     let advancedChecksExecuted = false;
+    let advancedCheckFailureReason = null;
     
     let qualityCheckDetails = null;
     let qualityWarnings = [];
@@ -168,7 +169,18 @@ export const uploadNote = async (req, res, next) => {
       pdfBuffer = fs.readFileSync(filePath);
     } else if (useCloudinary && req.cloudinaryFile?.publicId) {
       try {
-        const upstream = await downloadCloudinaryFile(req.cloudinaryFile.publicId);
+        let upstream = await downloadCloudinaryFile(req.cloudinaryFile.publicId);
+
+        if (!upstream.ok) {
+          logger.warn('Cloudinary admin download failed for quality check, trying signed URL fallback', {
+            status: upstream.status,
+            publicId: req.cloudinaryFile.publicId,
+          });
+
+          const signedUrl = generateSignedUrl(req.cloudinaryFile.publicId, 600);
+          upstream = await fetch(signedUrl);
+        }
+
         if (upstream.ok) {
           pdfBuffer = Buffer.from(await upstream.arrayBuffer());
         }
@@ -202,6 +214,10 @@ export const uploadNote = async (req, res, next) => {
         // ── Step 3: Groq AI checks (blank pages, scan quality, copyright) ──
         const aiChecks = await geminiQualityChecker.runGeminiChecks(pdfBuffer);
         logger.info(`AI analysis: ${aiChecks.usedAI ? 'Groq' : 'fallback rule-based'}`);
+
+        if (!aiChecks.usedAI) {
+          throw new Error('Groq AI quality checks are unavailable. Upload rejected by strict policy.');
+        }
 
         qualityCheckDetails = {
           success: true,
@@ -238,13 +254,14 @@ export const uploadNote = async (req, res, next) => {
           warnings:   qualityWarnings.length,
         });
       } catch (error) {
+        advancedCheckFailureReason = error.message;
         logger.error('Advanced quality check failed', { error: error.message });
       }
     }
 
     // Fail-safe: if mandatory PDF quality analysis could not run, reject upload.
     if (!advancedChecksExecuted) {
-      const analysisFailReason = 'Mandatory PDF quality analysis could not be completed';
+      const analysisFailReason = advancedCheckFailureReason || 'Mandatory PDF quality analysis could not be completed';
 
       advancedChecks = {
         copyrightCheck: false,
@@ -286,6 +303,7 @@ export const uploadNote = async (req, res, next) => {
         title,
         subject,
         useCloudinary,
+        reason: analysisFailReason,
       });
     }
 
