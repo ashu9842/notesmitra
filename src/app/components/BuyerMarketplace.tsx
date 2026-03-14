@@ -650,9 +650,9 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
             <div className="space-y-4">
               {paymentStep === "confirm" && (
                 <>
-                  <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
-                    <h4 className="text-base font-semibold leading-snug break-words">{selectedNote.title}</h4>
-                    <p className="text-sm text-muted-foreground break-words">
+                  <div className="space-y-2 rounded-lg border bg-muted/20 p-3 w-full max-w-full break-words">
+                    <h4 className="text-base font-semibold leading-snug w-full max-w-full break-words break-all whitespace-pre-line" style={{wordBreak: 'break-word', overflowWrap: 'break-word'}}>{selectedNote.title}</h4>
+                    <p className="text-sm text-muted-foreground w-full max-w-full break-words break-all whitespace-pre-line" style={{wordBreak: 'break-word', overflowWrap: 'break-word'}}>
                       {selectedNote.subject} • {selectedNote.course}
                     </p>
                   </div>
