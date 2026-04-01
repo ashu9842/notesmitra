@@ -20,7 +20,7 @@ export function PremiumPlans({ isPremium, onUpgrade, isLoggedIn, onLoginRequired
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-0">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold">Premium Membership</h2>
         <p className="text-lg text-muted-foreground">
@@ -28,7 +28,7 @@ export function PremiumPlans({ isPremium, onUpgrade, isLoggedIn, onLoginRequired
         </p>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
         {/* Free Plan */}
         <Card className={`transition-all cursor-pointer border-2 ${
           !isPremium 
@@ -197,10 +197,10 @@ export function PremiumPlans({ isPremium, onUpgrade, isLoggedIn, onLoginRequired
       </div>
 
       {/* Value Proposition */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 max-w-5xl mx-auto">
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-6 max-w-5xl mx-auto mt-6">
         <div className="text-center space-y-3">
           <h3 className="text-xl font-bold text-blue-900">💡 Smart Investment for Active Users</h3>
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <p className="font-semibold text-blue-600 mb-1">For Sellers</p>
               <p className="text-muted-foreground">Upload just 2-3 notes and the unlimited uploads + visibility boost pays for itself!</p>
