@@ -204,13 +204,13 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
         </Card>
       )}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="flex items-center gap-2">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
               <Upload className="w-5 h-5" />
               Upload New Notes
             </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
               {sellerPremium?.active ? (
                 <Badge className="bg-yellow-500 text-white flex items-center gap-1 px-2 py-0.5">
                   <Crown className="w-3 h-3" /> Premium Seller
@@ -242,7 +242,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="title">Title</Label>
                 <Input
