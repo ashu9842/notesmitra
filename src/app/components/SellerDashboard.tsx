@@ -244,8 +244,8 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-[4%] lg:grid-cols-2">
+              <div className="space-y-2 w-full">
                 <Label htmlFor="title">Title</Label>
                 <Input
                   id="title"
@@ -254,9 +254,10 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   placeholder="e.g., Advanced Calculus Complete Notes"
                   required
                   disabled={isUploading}
+                  style={{ width: '100%' }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 w-full">
                 <Label htmlFor="subject">Subject</Label>
                 <Input
                   id="subject"
@@ -265,9 +266,10 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   placeholder="e.g., Mathematics"
                   required
                   disabled={isUploading}
+                  style={{ width: '100%' }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 w-full">
                 <Label htmlFor="course">Semester / Course</Label>
                 <Input
                   id="course"
@@ -276,9 +278,10 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   placeholder="e.g., B.Sc Mathematics"
                   required
                   disabled={isUploading}
+                  style={{ width: '100%' }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 w-full">
                 <Label htmlFor="description">Description</Label>
                 <Input
                   id="description"
@@ -287,9 +290,10 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   placeholder="Briefly describe your notes"
                   required
                   disabled={isUploading}
+                  style={{ width: '100%' }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 w-full">
                 <Label htmlFor="pages">Pages</Label>
                 <Input
                   id="pages"
@@ -300,9 +304,10 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   required
                   disabled={isUploading}
                   min="3"
+                  style={{ width: '100%' }}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 w-full">
                 <Label htmlFor="price">Price (₹)</Label>
                 <Input
                   id="price"
@@ -315,10 +320,11 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   min="20"
                   max="50"
                   step="1"
+                  style={{ width: '100%' }}
                 />
                 <p className="text-xs text-muted-foreground">Min: ₹20 | Max: ₹50</p>
               </div>
-              <div className="space-y-2 lg:col-span-2">
+              <div className="space-y-2 w-full lg:col-span-2">
                 <Label htmlFor="file">PDF File</Label>
                 <Input
                   ref={fileInputRef}
@@ -329,10 +335,11 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   onChange={(e) => setFormData({ ...formData, file: e.target.files?.[0] || null })}
                   required
                   disabled={isUploading}
+                  style={{ width: '100%' }}
                 />
               </div>
             </div>
-            <Button type="submit" disabled={isUploading} className="w-full">
+            <Button type="submit" disabled={isUploading} className="w-full min-h-[44px] text-base">
               {isUploading ? "Running Quality Checks..." : "Upload Notes"}
             </Button>
           </form>
