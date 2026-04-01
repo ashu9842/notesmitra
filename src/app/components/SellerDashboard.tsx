@@ -195,7 +195,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-0">
       {errorMessage && (
         <Card>
           <CardContent className="py-4 text-center text-red-600">
@@ -206,13 +206,13 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                 <Upload className="w-5 h-5" />
                 Upload New Notes
               </CardTitle>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap gap-2">
               {sellerPremium?.active ? (
                 <Badge className="bg-yellow-500 text-white flex items-center gap-1 px-2 py-0.5 text-xs sm:text-sm whitespace-nowrap">
                   <Crown className="w-3 h-3" /> Premium Seller
@@ -244,7 +244,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-[4%] lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:gap-6 md:gap-8 md:grid-cols-2">
               <div className="space-y-2 w-full">
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -324,7 +324,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                 />
                 <p className="text-xs text-muted-foreground">Min: ₹20 | Max: ₹50</p>
               </div>
-              <div className="space-y-2 w-full lg:col-span-2">
+              <div className="space-y-2 w-full md:col-span-2">
                 <Label htmlFor="file">PDF File</Label>
                 <Input
                   ref={fileInputRef}
@@ -399,7 +399,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
 
       <Card>
         <CardHeader>
-          <CardTitle>My Uploaded Notes</CardTitle>
+          <CardTitle className="text-base sm:text-lg">My Uploaded Notes</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -413,19 +413,19 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
             ) : (
               <>
                 {(showAllNotes ? notes : notes.slice(0, NOTES_PREVIEW_COUNT)).map((note) => (
-                  <div key={note.id} className="border rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="flex items-center gap-2">
+                  <div key={note.id} className="border rounded-lg p-4 space-y-3 bg-white dark:bg-card shadow-sm overflow-x-auto">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                      <div className="min-w-0">
+                        <h3 className="flex items-center gap-2 text-base font-semibold truncate">
                           <FileText className="w-4 h-4" />
-                          {note.title}
+                          <span className="truncate max-w-[180px] sm:max-w-xs md:max-w-md" title={note.title}>{note.title}</span>
                           {note.isFeatured && (
                             <span title="Featured — boosted visibility" className="inline-flex items-center gap-0.5 text-yellow-600">
                               <Star className="w-3.5 h-3.5 fill-yellow-400" />
                             </span>
                           )}
                         </h3>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground truncate max-w-[180px] sm:max-w-xs md:max-w-md">
                           {note.subject} • {note.course}
                         </p>
                         <p className="text-sm">₹{note.price}</p>
@@ -442,7 +442,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                           )}
                         </div>
                       </div>
-                      {getStatusBadge(note.status)}
+                      <div className="mt-2 sm:mt-0">{getStatusBadge(note.status)}</div>
                     </div>
 
                     {/* Quality check panel for failed notes */}
