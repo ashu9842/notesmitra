@@ -330,7 +330,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   ref={fileInputRef}
                   id="file"
                   type="file"
-                  className="text-base file:text-sm"
+                  className="text-base file:text-sm min-h-[44px]"
                   accept=".pdf"
                   onChange={(e) => setFormData({ ...formData, file: e.target.files?.[0] || null })}
                   required
@@ -339,7 +339,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                 />
               </div>
             </div>
-            <Button type="submit" disabled={isUploading} className="w-full min-h-[44px] text-base">
+            <Button type="submit" disabled={isUploading} className="w-full min-h-[44px] text-base mt-6">
               {isUploading ? "Running Quality Checks..." : "Upload Notes"}
             </Button>
           </form>
