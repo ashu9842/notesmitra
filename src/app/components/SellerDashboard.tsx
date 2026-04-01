@@ -102,7 +102,7 @@ function QualityCheckPanel({ checks, checkResults, rejectionReason, usedAI }: {
                 color: #18162e !important;
               }
             `}</style>
-            <p className="text-sm text-red-800 dark:text-red-300" style={{color: 'var(--color-destructive-foreground, #ff6b6b)'}}> {rejectionReason}</p>
+            <p className="text-sm text-red-800 dark:text-red-800" style={{color: 'var(--color-destructive-foreground)'}}> {rejectionReason}</p>
           </div>
         </div>
       )}
