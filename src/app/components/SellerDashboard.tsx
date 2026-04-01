@@ -77,11 +77,11 @@ function QualityCheckPanel({ checks, checkResults, rejectionReason, usedAI }: {
         ))}
       </div>
       {rejectionReason && (
-        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded mt-2">
-          <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
+        <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-700 rounded mt-2">
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium">Rejection Reason:</p>
-            <p className="text-sm text-red-800">{rejectionReason}</p>
+            <p className="text-sm font-medium text-red-700 dark:text-red-300">Rejection Reason:</p>
+            <p className="text-sm text-red-800 dark:text-red-200">{rejectionReason}</p>
           </div>
         </div>
       )}
