@@ -20,7 +20,7 @@ export function SellerPremiumPlans({ isPremium, expiryDate, onUpgrade, onComboUp
   const isSellerOnlyActive = isPremium && !hasComboActive;
   
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-0">
       <div className="text-center space-y-2">
         <h2 className="text-3xl font-bold">Seller Premium Plans</h2>
         <p className="text-lg text-muted-foreground">
@@ -29,7 +29,7 @@ export function SellerPremiumPlans({ isPremium, expiryDate, onUpgrade, onComboUp
       </div>
 
       <div className="overflow-x-auto">
-      <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto min-w-0">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto min-w-0">
         {/* Free Seller Plan */}
         <Card className={`transition-all border-2 ${
           !isPremium && showCurrentPlan
@@ -282,10 +282,10 @@ export function SellerPremiumPlans({ isPremium, expiryDate, onUpgrade, onComboUp
 
       {/* Value Comparison */}
       {showCurrentPlan && (
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/40 dark:to-purple-950/40 border border-blue-200 dark:border-blue-800/50 rounded-xl p-6 max-w-6xl mx-auto">
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/40 dark:to-purple-950/40 border border-blue-200 dark:border-blue-800/50 rounded-xl p-6 max-w-6xl mx-auto mt-6">
           <div className="text-center space-y-3">
             <h3 className="text-xl font-bold text-blue-900 dark:text-blue-200">💡 Why Choose Combo Pack?</h3>
-            <div className="grid md:grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div className="bg-white dark:bg-card p-3 rounded-lg">
                 <p className="font-semibold text-green-600 dark:text-green-400">Save ₹49/month</p>
                 <p className="text-xs text-muted-foreground">₹588 savings annually</p>
