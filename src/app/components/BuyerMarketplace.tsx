@@ -390,11 +390,11 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 px-2 sm:px-0">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle>Search Notes</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-wrap">
+            <CardTitle className="text-base sm:text-lg">Search Notes</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               {buyerPremium?.active && (
                 <Badge className="bg-yellow-500 text-white flex items-center gap-1 px-2 py-0.5">
@@ -422,7 +422,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -432,9 +432,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
                 className="pl-10"
               />
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            <div className="w-full sm:w-56">
               <label className="text-sm mb-2 block">Subject</label>
               <select
                 value={selectedSubject}
@@ -460,14 +458,14 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {!showBookmarks && filteredNotes.length === 0 ? (
           <div className="col-span-full text-center py-12 text-muted-foreground">
             No notes found matching your criteria
           </div>
         ) : (
           (showBookmarks ? filteredNotes.filter(n => bookmarkedNotes.includes(n.id)) : filteredNotes).map((note) => (
-            <Card key={note.id} className={`hover:shadow-lg transition-shadow ${note.isFeatured ? 'ring-2 ring-yellow-400 dark:ring-yellow-600/60' : ''}`}>
+            <Card key={note.id} className={`hover:shadow-lg transition-shadow ${note.isFeatured ? 'ring-2 ring-yellow-400 dark:ring-yellow-600/60' : ''} bg-white dark:bg-card rounded-lg overflow-x-auto`}>
               {note.isFeatured && (
                 <div className="bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-xs font-bold px-3 py-1 flex items-center gap-1 rounded-t-lg">
                   <Star className="w-3 h-3 fill-white" /> Featured Note
@@ -477,7 +475,7 @@ export function BuyerMarketplace({ notes, purchasedNotes, onPurchase, isLoggedIn
                 </div>
               )}
               <CardHeader>
-                <div className="flex items-start justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                   <NotePdfIcon size={40} featured={note.isFeatured} />
                   <div className="flex items-center gap-1 flex-wrap justify-end">
                     {isLoggedIn && (
