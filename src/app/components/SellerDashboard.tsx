@@ -322,7 +322,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                   ref={fileInputRef}
                   id="file"
                   type="file"
-                  className="text-sm file:text-xs sm:file:text-sm"
+                  className="text-base file:text-sm"
                   accept=".pdf"
                   onChange={(e) => setFormData({ ...formData, file: e.target.files?.[0] || null })}
                   required
