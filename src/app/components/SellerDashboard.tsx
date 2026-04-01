@@ -205,20 +205,22 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
       )}
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-              <Upload className="w-5 h-5" />
-              Upload New Notes
-            </CardTitle>
-            <div className="flex items-center gap-2 flex-wrap sm:justify-end">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Upload className="w-5 h-5" />
+                Upload New Notes
+              </CardTitle>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
               {sellerPremium?.active ? (
-                <Badge className="bg-yellow-500 text-white flex items-center gap-1 px-2 py-0.5 text-xs sm:text-sm">
+                <Badge className="bg-yellow-500 text-white flex items-center gap-1 px-2 py-0.5 text-xs sm:text-sm whitespace-nowrap">
                   <Crown className="w-3 h-3" /> Premium Seller
                 </Badge>
               ) : null}
               <Badge
                 variant={sellerPremium?.active ? "default" : "outline"}
-                className={`flex items-center gap-1 px-2 py-0.5 text-xs ${
+                className={`flex items-center gap-1 px-2 py-0.5 text-xs whitespace-nowrap ${
                   !sellerPremium?.active && monthlyUploads >= 5
                     ? 'border-red-400 text-red-600'
                     : !sellerPremium?.active
@@ -232,7 +234,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
               {!sellerPremium?.active && monthlyUploads >= 4 && (
                 <button
                   onClick={onUpgradePremium}
-                  className="text-xs text-yellow-700 underline hover:text-yellow-900"
+                  className="text-xs text-yellow-700 underline hover:text-yellow-900 whitespace-nowrap"
                 >
                   Upgrade for unlimited
                 </button>
