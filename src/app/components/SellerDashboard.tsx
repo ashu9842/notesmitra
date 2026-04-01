@@ -212,7 +212,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap sm:justify-end">
               {sellerPremium?.active ? (
-                <Badge className="bg-yellow-500 text-white flex items-center gap-1 px-2 py-0.5">
+                <Badge className="bg-yellow-500 text-white flex items-center gap-1 px-2 py-0.5 text-xs sm:text-sm">
                   <Crown className="w-3 h-3" /> Premium Seller
                 </Badge>
               ) : null}
@@ -242,7 +242,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="title">Title</Label>
                 <Input
@@ -316,12 +316,13 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                 />
                 <p className="text-xs text-muted-foreground">Min: ₹20 | Max: ₹50</p>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 lg:col-span-2">
                 <Label htmlFor="file">PDF File</Label>
                 <Input
                   ref={fileInputRef}
                   id="file"
                   type="file"
+                  className="text-sm file:text-xs sm:file:text-sm"
                   accept=".pdf"
                   onChange={(e) => setFormData({ ...formData, file: e.target.files?.[0] || null })}
                   required
