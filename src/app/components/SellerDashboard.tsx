@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
-import { Upload, FileText, AlertCircle, CheckCircle2, XCircle, Crown, Zap, Star, BarChart2, TrendingUp, Lock } from "lucide-react";
+import { Upload, FileText, AlertCircle, CheckCircle2, XCircle, Crown, Zap, Star, BarChart2, TrendingUp, Lock, Search } from "lucide-react";
+  const [searchTerm, setSearchTerm] = useState("");
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -215,6 +216,16 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
     return <Badge variant={variants[status] || "default"}>{labels[status] || status.toUpperCase()}</Badge>;
   };
 
+  // Filter notes by search term
+  const filteredNotes = notes.filter(note => {
+    const term = searchTerm.toLowerCase();
+    return (
+      note.title.toLowerCase().includes(term) ||
+      note.subject.toLowerCase().includes(term) ||
+      note.course.toLowerCase().includes(term)
+    );
+  });
+
   return (
     <div className="space-y-6 px-2 sm:px-0">
       {errorMessage && (
@@ -224,7 +235,25 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
           </CardContent>
         </Card>
       )}
+      {/* Search Notes Section */}
       <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base sm:text-lg">Search Notes</CardTitle>
+        </CardHeader>
+        <CardContent className="pb-2">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                className="pl-10 pr-3 py-2 rounded-lg border border-input bg-background text-base focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all w-full"
+                placeholder="Search by title, subject, or course..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                style={{ minHeight: 40 }}
+              />
+            </div>
+          </div>
+        </CardContent>
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 flex-wrap">
@@ -429,11 +458,11 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
                 <div className="h-16 bg-gray-100 rounded" />
                 <div className="h-16 bg-gray-100 rounded" />
               </div>
-            ) : notes.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground">No notes uploaded yet</p>
+            ) : filteredNotes.length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">No notes found</p>
             ) : (
               <>
-                {(showAllNotes ? notes : notes.slice(0, NOTES_PREVIEW_COUNT)).map((note) => (
+                {(showAllNotes ? filteredNotes : filteredNotes.slice(0, NOTES_PREVIEW_COUNT)).map((note) => (
                   <div key={note.id} className="border rounded-lg p-4 space-y-3 bg-white dark:bg-card shadow-sm overflow-x-auto">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                       <div className="min-w-0">
