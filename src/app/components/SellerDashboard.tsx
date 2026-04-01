@@ -80,7 +80,28 @@ function QualityCheckPanel({ checks, checkResults, rejectionReason, usedAI }: {
         <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-700 rounded mt-2">
           <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-red-700 dark:text-red-300">Rejection Reason:</p>
+            <span
+              className="text-sm font-medium text-red-700 dark:text-red-200 select-text highlight-reason"
+              style={{
+                backgroundColor: 'transparent',
+                padding: '0 2px',
+                borderRadius: '3px',
+                WebkitUserSelect: 'text',
+                userSelect: 'text',
+              }}
+            >
+              Rejection Reason:
+            </span>
+            <style>{`
+              .highlight-reason::selection {
+                background: #2563eb !important;
+                color: #fff !important;
+              }
+              .dark .highlight-reason::selection {
+                background: #60a5fa !important;
+                color: #18162e !important;
+              }
+            `}</style>
             <p className="text-sm text-red-800 dark:text-red-200">{rejectionReason}</p>
           </div>
         </div>
