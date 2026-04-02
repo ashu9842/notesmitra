@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { Upload, FileText, AlertCircle, CheckCircle2, XCircle, Crown, Zap, Star, BarChart2, TrendingUp, Lock, Search } from "lucide-react";
-  const [searchTerm, setSearchTerm] = useState("");
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -125,6 +124,7 @@ export function SellerDashboard({ notes, onUploadNote, isLoading = false, errorM
   const [isUploading, setIsUploading] = useState(false);
   const [showAllNotes, setShowAllNotes] = useState(false);
   const [uploadQualityResult, setUploadQualityResult] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const NOTES_PREVIEW_COUNT = 5;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
