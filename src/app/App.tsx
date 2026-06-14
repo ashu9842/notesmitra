@@ -156,6 +156,30 @@ export default function App() {
     isPriorityApproval: Boolean(note.isPriorityApproval),
     sellerSubscriptionType: note.sellerSubscriptionType || 'free_seller'
   });
+
+  // Helper function to check if premium is expired
+  const isPremiumExpired = (expiryDate?: string): boolean => {
+    if (!expiryDate) return false;
+    try {
+      const expiry = new Date(expiryDate);
+      return expiry < new Date();
+    } catch {
+      return false;
+    }
+  };
+
+  // Get premium status with expiration check
+  const getPremiumStatus = (user: User | null) => {
+    if (!user) return { isBuyerActive: false, isSellerActive: false, isBuyerExpired: false, isSellerExpired: false };
+    
+    return {
+      isBuyerActive: user.buyerPremium.active && !isPremiumExpired(user.buyerPremium.expiryDate),
+      isSellerActive: user.sellerPremium.active && !isPremiumExpired(user.sellerPremium.expiryDate),
+      isBuyerExpired: user.buyerPremium.active && isPremiumExpired(user.buyerPremium.expiryDate),
+      isSellerExpired: user.sellerPremium.active && isPremiumExpired(user.sellerPremium.expiryDate)
+    };
+  };
+
   // Set document title and meta tags for mobile devices
   useEffect(() => {
     // Set document title
@@ -1336,7 +1360,25 @@ export default function App() {
                   <>
                     {isLoggedIn ? (
                       <>
-                        <span className="text-sm">Hi, {currentUser?.name}</span>
+                        <div className="text-sm flex items-center gap-2">
+                          <span>Hi, {currentUser?.name}</span>
+                          {(() => {
+                            const { isBuyerActive, isSellerActive, isBuyerExpired, isSellerExpired } = getPremiumStatus(currentUser);
+                            if (isBuyerExpired || isSellerExpired) {
+                              return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">Expired</span>;
+                            }
+                            if (isBuyerActive && isSellerActive) {
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-700">👑 Combo</span>;
+                            }
+                            if (isBuyerActive) {
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-700">⭐ Buyer Pro</span>;
+                            }
+                            if (isSellerActive) {
+                              return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700">⭐ Seller Pro</span>;
+                            }
+                            return null;
+                          })()}
+                        </div>
                         <Button variant="outline" size="sm" onClick={() => setShowChangePassword(true)}>
                           <Settings className="w-4 h-4 mr-2" />
                           Change Password
@@ -1411,8 +1453,24 @@ export default function App() {
                 <>
                   {isLoggedIn ? (
                     <>
-                      <div className="px-4 py-2 text-sm font-medium">
-                        Hi, {currentUser?.name}
+                      <div className="px-4 py-2 text-sm font-medium flex items-center justify-between gap-2 flex-wrap">
+                        <span>Hi, {currentUser?.name}</span>
+                        {(() => {
+                          const { isBuyerActive, isSellerActive, isBuyerExpired, isSellerExpired } = getPremiumStatus(currentUser);
+                          if (isBuyerExpired || isSellerExpired) {
+                            return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">Expired</span>;
+                          }
+                          if (isBuyerActive && isSellerActive) {
+                            return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900 dark:to-pink-900 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-700">👑 Combo</span>;
+                          }
+                          if (isBuyerActive) {
+                            return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-700">⭐ Buyer Pro</span>;
+                          }
+                          if (isSellerActive) {
+                            return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700">⭐ Seller Pro</span>;
+                          }
+                          return null;
+                        })()}
                       </div>
                       <Button 
                         variant="outline" 
@@ -1966,12 +2024,13 @@ export default function App() {
                 <TabsContent value="premium">
                   <SellerPremiumPlans
                     isPremium={currentUser?.sellerPremium?.active || false}
+                    isExpired={isPremiumExpired(currentUser?.sellerPremium?.expiryDate)}
                     expiryDate={currentUser?.sellerPremium?.expiryDate}
                     onUpgrade={handleSellerPremiumUpgrade}
                     onComboUpgrade={handleComboPremiumUpgrade}
                     walletBalance={walletBalance}
                     onFeatureNote={handleFeatureNote}
-                    hasComboActive={currentUser?.sellerPremium?.active && currentUser?.buyerPremium?.active}
+                    hasComboActive={currentUser?.sellerPremium?.active && currentUser?.buyerPremium?.active && !isPremiumExpired(currentUser?.sellerPremium?.expiryDate) && !isPremiumExpired(currentUser?.buyerPremium?.expiryDate)}
                   />
                 </TabsContent>
                 </Tabs>
@@ -2077,10 +2136,11 @@ export default function App() {
                 <TabsContent value="premium">
                   <BuyerPremiumPlans
                     isPremium={currentUser?.buyerPremium?.active || false}
+                    isExpired={isPremiumExpired(currentUser?.buyerPremium?.expiryDate)}
                     expiryDate={currentUser?.buyerPremium?.expiryDate}
                     onUpgrade={handleBuyerPremiumUpgrade}
                     onComboUpgrade={handleComboPremiumUpgrade}
-                    hasComboActive={currentUser?.sellerPremium?.active && currentUser?.buyerPremium?.active}
+                    hasComboActive={currentUser?.sellerPremium?.active && currentUser?.buyerPremium?.active && !isPremiumExpired(currentUser?.sellerPremium?.expiryDate) && !isPremiumExpired(currentUser?.buyerPremium?.expiryDate)}
                   />
                 </TabsContent>
                 </Tabs>

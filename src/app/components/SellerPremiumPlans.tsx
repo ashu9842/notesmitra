@@ -5,6 +5,7 @@ import { Badge } from "./ui/badge";
 
 interface SellerPremiumPlansProps {
   isPremium: boolean;
+  isExpired?: boolean;
   expiryDate?: string;
   onUpgrade: () => void;
   onComboUpgrade?: () => void;
@@ -15,9 +16,9 @@ interface SellerPremiumPlansProps {
   hasComboActive?: boolean;
 }
 
-export function SellerPremiumPlans({ isPremium, expiryDate, onUpgrade, onComboUpgrade, walletBalance, onFeatureNote, isLoggedIn, showCurrentPlan = true, hasComboActive = false }: SellerPremiumPlansProps) {
+export function SellerPremiumPlans({ isPremium, isExpired = false, expiryDate, onUpgrade, onComboUpgrade, walletBalance, onFeatureNote, isLoggedIn, showCurrentPlan = true, hasComboActive = false }: SellerPremiumPlansProps) {
   // Check if ONLY seller premium is active (not combo)
-  const isSellerOnlyActive = isPremium && !hasComboActive;
+  const isSellerOnlyActive = isPremium && !hasComboActive && !isExpired;
   
   return (
     <div className="space-y-6 px-2 sm:px-0">
@@ -79,8 +80,10 @@ export function SellerPremiumPlans({ isPremium, expiryDate, onUpgrade, onComboUp
         <Card className={`transition-all border-2 relative overflow-hidden ${
           isSellerOnlyActive && showCurrentPlan
             ? "border-yellow-500 dark:border-yellow-600/60 bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-950/30 dark:to-orange-950/20"
-            : hasComboActive && showCurrentPlan
+            : hasComboActive && showCurrentPlan && !isExpired
             ? "border-green-400 dark:border-green-700/60 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 opacity-80"
+            : isPremium && isExpired && showCurrentPlan
+            ? "border-gray-300 dark:border-gray-700/60 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950/30 dark:to-gray-900/20 opacity-70"
             : "border-blue-500 dark:border-blue-600/70 hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-xl cursor-pointer"
         }`}>
           {!showCurrentPlan && (
@@ -93,10 +96,16 @@ export function SellerPremiumPlans({ isPremium, expiryDate, onUpgrade, onComboUp
               ACTIVE
             </div>
           )}
-          {hasComboActive && showCurrentPlan && (
+          {hasComboActive && showCurrentPlan && !isExpired && (
             <div className="absolute top-0 right-0 bg-green-600 text-white px-4 py-1 text-xs font-bold transform rotate-12 translate-x-6 -translate-y-1">
               IN COMBO
             </div>
+          )}
+          {isPremium && isExpired && showCurrentPlan && (
+            <div className="absolute top-0 right-0 bg-gray-500 text-white px-3 py-1 text-xs font-bold transform rotate-12 translate-x-6 -translate-y-1">
+              EXPIRED
+            </div>
+          )}
           )}
 
           <CardHeader className="pb-4">
@@ -108,14 +117,27 @@ export function SellerPremiumPlans({ isPremium, expiryDate, onUpgrade, onComboUp
               {isSellerOnlyActive && showCurrentPlan && (
                 <Badge className="bg-yellow-600">Active</Badge>
               )}
-              {hasComboActive && showCurrentPlan && (
+              {hasComboActive && showCurrentPlan && !isExpired && (
                 <Badge className="bg-green-600">In Combo</Badge>
+              )}
+              {isPremium && isExpired && showCurrentPlan && (
+                <Badge className="bg-gray-500">Expired</Badge>
               )}
             </div>
             <div>
               <span className="text-4xl font-bold text-blue-600 dark:text-blue-400">₹99</span>
               <span className="text-muted-foreground">/month</span>
             </div>
+            {isPremium && isExpired && expiryDate && (
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                Expired on {new Date(expiryDate).toLocaleDateString()}
+              </p>
+            )}
+            {isSellerOnlyActive && expiryDate && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                Valid until {new Date(expiryDate).toLocaleDateString()}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
