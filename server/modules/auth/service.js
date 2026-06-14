@@ -40,6 +40,38 @@ export class AuthService {
     await this.repository.createRefreshToken({ userId, token, expiresAt });
   }
 
+  // Helper: Check subscription expiry and normalize user premium status
+  async getActiveSubscriptionStatus(user) {
+    if (!user) return { isPremiumBuyer: false, isPremiumSeller: false, hasExpired: false };
+    
+    // Check if subscription has expired
+    const hasActiveSubscription = user.hasActiveSubscription ? user.hasActiveSubscription() : 
+      (user.subscriptionExpiry ? new Date() <= user.subscriptionExpiry : false);
+
+    const hasExpiredSubscription = (user.isPremiumBuyer || user.isPremiumSeller) && !hasActiveSubscription;
+
+    // If subscription expired, update it in the database
+    if (hasExpiredSubscription) {
+      try {
+        await this.repository.updateUserById(user._id, {
+          isPremiumBuyer: false,
+          isPremiumSeller: false,
+          subscriptionType: 'free_buyer',
+          subscriptionExpiry: null,
+          currentSubscriptionId: null
+        });
+      } catch (error) {
+        // Log but don't throw - user data is still valid even if we can't update DB
+      }
+    }
+
+    return {
+      isPremiumBuyer: user.isPremiumBuyer && hasActiveSubscription,
+      isPremiumSeller: user.isPremiumSeller && hasActiveSubscription,
+      hasExpired: hasExpiredSubscription
+    };
+  }
+
   async signupUser({ email, password, name, role }) {
     const { ROLES, ERROR_CODES } = this.constants;
 
@@ -215,8 +247,8 @@ export class AuthService {
       walletBalance: user.walletBalance,
       totalEarnings: user.totalEarnings,
       totalSpent: user.totalSpent,
-      isPremiumBuyer: user.isPremiumBuyer || false,
-      isPremiumSeller: user.isPremiumSeller || false,
+      isPremiumBuyer: (await this.getActiveSubscriptionStatus(user)).isPremiumBuyer || false,
+      isPremiumSeller: (await this.getActiveSubscriptionStatus(user)).isPremiumSeller || false,
       subscriptionType: user.subscriptionType || 'free_buyer',
       subscriptionExpiry: user.subscriptionExpiry || null,
       currentSubscriptionId: user.currentSubscriptionId || null,
@@ -260,6 +292,8 @@ export class AuthService {
 
     await this.storeRefreshToken(user._id, refreshToken);
 
+    const { isPremiumBuyer, isPremiumSeller } = await this.getActiveSubscriptionStatus(user);
+
     return {
       user: {
         id: user._id,
@@ -270,8 +304,8 @@ export class AuthService {
         walletBalance: user.walletBalance,
         totalEarnings: user.totalEarnings,
         totalSpent: user.totalSpent,
-        isPremiumBuyer: user.isPremiumBuyer || false,
-        isPremiumSeller: user.isPremiumSeller || false,
+        isPremiumBuyer: isPremiumBuyer || false,
+        isPremiumSeller: isPremiumSeller || false,
         subscriptionType: user.subscriptionType || 'free_buyer',
         subscriptionExpiry: user.subscriptionExpiry || null,
         currentSubscriptionId: user.currentSubscriptionId || null,
@@ -371,6 +405,30 @@ export class AuthService {
       throw this.createError('User not found', 404, ERROR_CODES.AUTH);
     }
 
+    // Check if subscription has expired and auto-downgrade if needed
+    const hasActiveSubscription = user.hasActiveSubscription();
+    let isPremiumBuyer = user.isPremiumBuyer && hasActiveSubscription;
+    let isPremiumSeller = user.isPremiumSeller && hasActiveSubscription;
+    let subscriptionType = user.subscriptionType || 'free_buyer';
+    let subscriptionExpiry = user.subscriptionExpiry || null;
+
+    // If subscription expired, downgrade to free and save
+    if ((user.isPremiumBuyer || user.isPremiumSeller) && !hasActiveSubscription) {
+      subscriptionType = 'free_buyer';
+      isPremiumBuyer = false;
+      isPremiumSeller = false;
+      subscriptionExpiry = null;
+      
+      // Update in database
+      await this.repository.updateUserById(userId, {
+        isPremiumBuyer: false,
+        isPremiumSeller: false,
+        subscriptionType: 'free_buyer',
+        subscriptionExpiry: null,
+        currentSubscriptionId: null
+      });
+    }
+
     return {
       id: user._id,
       email: user.email,
@@ -382,11 +440,11 @@ export class AuthService {
       totalEarnings: user.totalEarnings,
       totalSpent: user.totalSpent,
       createdAt: user.createdAt,
-      // Premium subscription fields
-      isPremiumBuyer: user.isPremiumBuyer || false,
-      isPremiumSeller: user.isPremiumSeller || false,
-      subscriptionType: user.subscriptionType || 'free_buyer',
-      subscriptionExpiry: user.subscriptionExpiry || null,
+      // Premium subscription fields - checked for expiry
+      isPremiumBuyer,
+      isPremiumSeller,
+      subscriptionType,
+      subscriptionExpiry,
       currentSubscriptionId: user.currentSubscriptionId || null,
       monthlyUploadsCount: user.monthlyUploadsCount || 0
     };
