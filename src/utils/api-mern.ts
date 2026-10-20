@@ -1,8 +1,8 @@
 // NotesMitra MERN Stack API Client
 
 const normalizeApiBaseUrl = (rawUrl?: string) => {
-  const fallbackUrl = 'http://localhost:5000';
-  const unquoted = (rawUrl || fallbackUrl).trim().replace(/^['"]|['"]$/g, '');
+const fallbackUrl = 'https://notesmitra-backend-2026-dhcuh8b8dnb7bgbm.centralindia-01.azurewebsites.net';
+const unquoted = (rawUrl || fallbackUrl).trim().replace(/^['"]|['"]$/g, '');
   const withoutTrailingSlash = unquoted.replace(/\/+$/g, '') || fallbackUrl;
   const withoutApiSuffix = withoutTrailingSlash.replace(/\/api$/i, '');
 

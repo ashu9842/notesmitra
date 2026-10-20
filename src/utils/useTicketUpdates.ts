@@ -26,7 +26,7 @@ export const useTicketUpdates = (
   dependencies: any[] = []
 ) => {
   useEffect(() => {
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const socketUrl = (import.meta.env.VITE_API_URL || 'https://notesmitra-backend-2026-dhcuh8b8dnb7bgbm.centralindia-01.azurewebsites.net').replace(/\/api\/?$/, '');
     const socketClient = new SocketClient(socketUrl);
 
     socketClient

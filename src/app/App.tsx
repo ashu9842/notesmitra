@@ -430,7 +430,7 @@ export default function App() {
       return;
     }
 
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const socketUrl = (import.meta.env.VITE_API_URL || 'https://notesmitra-backend-2026-dhcuh8b8dnb7bgbm.centralindia-01.azurewebsites.net').replace(/\/api\/?$/, '');
     const socketClient = new SocketClient(socketUrl);
 
     // Initialize socket connection
@@ -465,7 +465,7 @@ export default function App() {
       return;
     }
 
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const socketUrl = (import.meta.env.VITE_API_URL || 'https://notesmitra-backend-2026-dhcuh8b8dnb7bgbm.centralindia-01.azurewebsites.net').replace(/\/api\/?$/, '');
     const socketClient = new SocketClient(socketUrl);
 
     socketClient
@@ -530,7 +530,7 @@ export default function App() {
               if (fbUser) {
                 await fbUser.reload();
                 if (auth.currentUser?.emailVerified) {
-                  const apiBase = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+                  const apiBase = (import.meta.env.VITE_API_URL as string) || 'https://notesmitra-backend-2026-dhcuh8b8dnb7bgbm.centralindia-01.azurewebsites.net/api';
                   const r = await fetch(`${apiBase}/auth/confirm-email-verified`, { method: 'POST', credentials: 'include' });
                   if (r.ok) {
                     mappedUser = { ...mappedUser, isEmailVerified: true };
@@ -871,7 +871,7 @@ export default function App() {
           if (firebaseVerified === true) {
             // Verified in Firebase — sync to backend DB
             try {
-              const apiBase = (import.meta.env.VITE_API_URL as string) || 'http://localhost:5000/api';
+              const apiBase = (import.meta.env.VITE_API_URL as string) || 'https://notesmitra-backend-2026-dhcuh8b8dnb7bgbm.centralindia-01.azurewebsites.net/api';
               await fetch(`${apiBase}/auth/confirm-email-verified`, { method: 'POST', credentials: 'include' });
               mappedUser = { ...mappedUser, isEmailVerified: true };
             } catch { /* non-critical */ }

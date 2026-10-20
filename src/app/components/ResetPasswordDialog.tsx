@@ -37,7 +37,7 @@ export function ResetPasswordDialog({ isOpen, token, firebaseToken, onClose }: R
 
     try {
       setLoading(true);
-      const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+      const apiBase = (import.meta.env.VITE_API_URL || "https://notesmitra-backend-2026-dhcuh8b8dnb7bgbm.centralindia-01.azurewebsites.net/api").replace(/\/+$/, "");
 
       let res: Response;
       if (firebaseToken) {
