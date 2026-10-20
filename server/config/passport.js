@@ -47,7 +47,7 @@ const initializePassport = () => {
             institution = await Institution.create({
               name: 'NotesMitra',
               slug: 'notesmitra',
-              plan: 'premium',
+              plan: 'free',
               maxUsers: 50000,
               storageLimit: 1000,
               isActive: true,
