@@ -70,12 +70,12 @@ const transports = [
 
 // Add console transport in development
 if (config.isDevelopment) {
-  transports.push(
-    new winston.transports.Console({
-      format: consoleFormat,
-      level: 'debug'
-    })
-  );
+transports.push(
+  new winston.transports.Console({
+    format: consoleFormat,
+    level: config.isProduction ? 'info' : 'debug'
+  })
+);
 }
 
 // Create logger instance
