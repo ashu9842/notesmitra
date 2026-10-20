@@ -18,7 +18,7 @@ import config from './config/index.js';
 import { initializeCacheClient } from './utils/cache.js';
 import logger from './utils/logger.js';
 import suppressConsoleOutput from './utils/consoleSuppress.js';
-import { findAvailablePort } from './utils/portFinder.js';
+
 import { requestLogger, requestTimer, slowRequestLogger } from './middleware/requestLogger.js';
 import { initializeFirebase } from './config/firebase.js';
 import { 
@@ -404,70 +404,22 @@ global.io = io;
 // Attach io instance to app for use in routes if needed
 app.set('io', io);
 
-// Start server with dynamic port detection
-const startServer = async () => {
-  let PORT = config.port;
-  
-  try {
-    // Check if the preferred port is available, if not find the next available one
-    const selectedPort = await findAvailablePort(PORT);
-    
-    if (selectedPort !== PORT) {
-      logger.warn('Preferred port in use, using dynamic port', {
-        preferredPort: PORT,
-        selectedPort: selectedPort
-      });
-      
-      if (config.isDevelopment) {
-        // Port fallback handled silently
-      }
-      
-      PORT = selectedPort;
-    }
-    
-    server = httpServer.listen(PORT, () => {
-      logger.info('Server started successfully', {
-        environment: config.env,
-        port: PORT,
-        url: `http://localhost:${PORT}`,
-        socketUrl: `ws://localhost:${PORT}`
-      });
-      
-      // Log startup info to console in development for better visibility
-      if (config.isDevelopment) {
-        logger.info(`NotesMitra Server Running on port ${PORT}`);
-        logger.info(`Environment: ${config.env}`);
-      }
-    });
+const PORT = Number(process.env.PORT || config.port || 5000);
 
-    server.on('error', (err) => {
-      if (err?.code === 'EADDRINUSE') {
-        logger.error('Port already in use', { port: PORT });
-        process.exit(0);
-      }
+server = httpServer.listen(PORT, '0.0.0.0', () => {
+  logger.info('Server started successfully', {
+    environment: config.env,
+    port: PORT,
+  });
+});
 
-      logger.error('HTTP server error', {
-        error: err.message,
-        stack: err.stack
-      });
-      process.exit(1);
-    });
-    
-    // Store the actual port in config for use by other modules
-    app.set('actualPort', PORT);
-    
-  } catch (error) {
-    logger.error('Failed to start server', {
-      error: error.message,
-      preferredPort: PORT
-    });
-    logger.error('Failed to find available port:', error.message);
-    process.exit(1);
-  }
-};
-
-// Start the server
-startServer();
+server.on('error', (err) => {
+  logger.error('HTTP server error', {
+    error: err.message,
+    stack: err.stack,
+  });
+  process.exit(1);
+});
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
