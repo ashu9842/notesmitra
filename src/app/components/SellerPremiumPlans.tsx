@@ -106,7 +106,7 @@ export function SellerPremiumPlans({ isPremium, isExpired = false, expiryDate, o
               EXPIRED
             </div>
           )}
-          )}
+          
 
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between mb-2">
