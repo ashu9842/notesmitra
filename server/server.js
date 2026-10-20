@@ -71,7 +71,7 @@ app.use((req, res, next) => {
 // CORS - MUST be early, before rate limiting
 const allowedOrigins = [
   ...(Array.isArray(config.clientUrl) ? config.clientUrl : String(config.clientUrl || '').split(',')),
-  'https://notesmitra.vercel.app',
+  'https://delightful-forest-0809f5700.6.azurestaticapps.net',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:3000',
