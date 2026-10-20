@@ -1,3 +1,4 @@
+
 import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
@@ -18,15 +19,17 @@ const logFormat = winston.format.combine(
   winston.format.json()
 );
 
-// Console format for development
+// Console format
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.printf(({ timestamp, level, message, ...meta }) => {
     let msg = `${timestamp} [${level}]: ${message}`;
+
     if (Object.keys(meta).length > 0) {
       msg += ` ${JSON.stringify(meta)}`;
     }
+
     return msg;
   })
 );
@@ -68,15 +71,13 @@ const transports = [
   httpRotateTransport
 ];
 
-// Add console transport in development
-if (config.isDevelopment) {
+// Console transport enabled in development and production
 transports.push(
   new winston.transports.Console({
     format: consoleFormat,
     level: config.isProduction ? 'info' : 'debug'
   })
 );
-}
 
 // Create logger instance
 const logger = winston.createLogger({
@@ -145,8 +146,7 @@ logger.logJob = (jobName, status, data = {}) => {
   });
 };
 
-// Suppress console output completely (both development and production)
-// All logging should use the logger instance instead
+// Redirect console methods to Winston
 console.log = (...args) => logger.debug(args.join(' '));
 console.error = (...args) => logger.error(args.join(' '));
 console.warn = (...args) => logger.warn(args.join(' '));
