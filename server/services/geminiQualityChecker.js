@@ -70,9 +70,9 @@ const analyseWithGroq = async (extractedText, pageCount, totalChars) => {
 
   // Existing model names retained; invalid models now trigger a retry.
   const MODEL_CHAIN = [
-    'llama-3.1-8b-instant',
-    'mixtral-8x7b-32768',
-  ];
+  'openai/gpt-oss-20b',
+  'openai/gpt-oss-120b',
+];
 
   const avgCharsPerPage =
     pageCount > 0 ? Math.round(totalChars / pageCount) : 0;
